@@ -1,0 +1,19 @@
+# NetBeans & Maven build folders
+/target/
+/build/
+/dist/
+.nbproject/private/
+nbproject/private/
+nbproject/build-impl.xml
+nbproject/genfiles.properties
+nbproject/project.properties
+nbproject/project.xml
+
+# Compiled classes
+*.class
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.DS_Store
