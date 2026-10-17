@@ -20,7 +20,6 @@ public class HomeForm extends javax.swing.JFrame {
     private boolean validateConnectionSettings() {
     String ip = txtServerIP.getText().trim();
     String serverPortText = txtServerPort.getText().trim();
-    String clientPortText = txtClientPort.getText().trim();
 
     if (ip.isEmpty()) {
         javax.swing.JOptionPane.showMessageDialog(
@@ -31,18 +30,10 @@ public class HomeForm extends javax.swing.JFrame {
 
     try {
         int serverPort = Integer.parseInt(serverPortText);
-        int clientPort = Integer.parseInt(clientPortText);
 
-        if (serverPort < 1 || serverPort > 65535
-                || clientPort < 1 || clientPort > 65535) {
+        if (serverPort < 1 || serverPort > 65535 ) {
             javax.swing.JOptionPane.showMessageDialog(
                     this, "Cổng phải nằm trong khoảng 1–65535.");
-            return false;
-        }
-
-        if (serverPort == clientPort) {
-            javax.swing.JOptionPane.showMessageDialog(
-                    this, "Cổng Server và Client phải khác nhau.");
             return false;
         }
 
@@ -83,10 +74,8 @@ public class HomeForm extends javax.swing.JFrame {
         jPanel3 = new javax.swing.JPanel();
         jLabel10 = new javax.swing.JLabel();
         txtServerIP = new javax.swing.JTextField();
-        txtClientPort = new javax.swing.JTextField();
         txtServerPort = new javax.swing.JTextField();
         jLabel12 = new javax.swing.JLabel();
-        jLabel13 = new javax.swing.JLabel();
         jLabel14 = new javax.swing.JLabel();
         btnExit = new javax.swing.JButton();
 
@@ -300,10 +289,6 @@ public class HomeForm extends javax.swing.JFrame {
         jLabel12.setForeground(new java.awt.Color(255, 255, 255));
         jLabel12.setText("IP Server");
 
-        jLabel13.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        jLabel13.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel13.setText("Cổng Client");
-
         jLabel14.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel14.setForeground(new java.awt.Color(255, 255, 255));
         jLabel14.setText("Cổng Server");
@@ -321,47 +306,38 @@ public class HomeForm extends javax.swing.JFrame {
         jPanel3Layout.setHorizontalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
-                .addGap(18, 18, 18)
+                .addGap(89, 89, 89)
                 .addComponent(txtServerIP, javax.swing.GroupLayout.PREFERRED_SIZE, 250, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 43, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(txtServerPort, javax.swing.GroupLayout.PREFERRED_SIZE, 250, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(48, 48, 48)
-                .addComponent(txtClientPort, javax.swing.GroupLayout.PREFERRED_SIZE, 250, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(32, 32, 32))
+                .addGap(130, 130, 130))
             .addGroup(jPanel3Layout.createSequentialGroup()
                 .addGap(34, 34, 34)
-                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel3Layout.createSequentialGroup()
-                        .addComponent(jLabel10)
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                    .addGroup(jPanel3Layout.createSequentialGroup()
-                        .addGap(66, 66, 66)
-                        .addComponent(jLabel12)
-                        .addGap(217, 217, 217)
-                        .addComponent(jLabel14)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jLabel13)
-                        .addGap(124, 124, 124))))
+                .addComponent(jLabel10)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel3Layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(btnExit)
                 .addGap(50, 50, 50))
+            .addGroup(jPanel3Layout.createSequentialGroup()
+                .addGap(178, 178, 178)
+                .addComponent(jLabel12)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jLabel14)
+                .addGap(216, 216, 216))
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel3Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jLabel10)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 57, Short.MAX_VALUE)
-                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel13, javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                        .addComponent(jLabel12)
-                        .addComponent(jLabel14)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 61, Short.MAX_VALUE)
+                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jLabel12)
+                    .addComponent(jLabel14))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(txtServerIP, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(txtClientPort, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(txtServerPort, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addComponent(btnExit, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -393,35 +369,34 @@ public class HomeForm extends javax.swing.JFrame {
     private void btnBroadcastActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBroadcastActionPerformed
         // TODO add your handling code here:
         if (!validateConnectionSettings()) {
-        return;
-    }
+            return;
+        }
 
-    javax.swing.JOptionPane.showMessageDialog(
-            this,
-            "Cấu hình hợp lệ. Tiếp theo sẽ mở BroadcastForm."
-    );
+        javax.swing.JOptionPane.showMessageDialog(
+                this,
+                "Cấu hình hợp lệ. Tiếp theo sẽ mở BroadcastForm."
+        );
     }//GEN-LAST:event_btnBroadcastActionPerformed
 
     private void btnListenActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnListenActionPerformed
         // TODO add your handling code here:
         if (!validateConnectionSettings()) {
         return;
-    }
-
-    javax.swing.JOptionPane.showMessageDialog(
-            this,
-            "Cấu hình hợp lệ. Tiếp theo sẽ mở ListenForm."
-    );
+        }
+        javax.swing.JOptionPane.showMessageDialog(
+                this,
+                "Cấu hình hợp lệ. Tiếp theo sẽ mở ListenForm."
+        );
     }//GEN-LAST:event_btnListenActionPerformed
 
     private void btnExitActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnExitActionPerformed
         // TODO add your handling code here:
-    int result = javax.swing.JOptionPane.showConfirmDialog(
-            this,
-            "Bạn có muốn thoát ứng dụng không?",
-            "Xác nhận thoát",
-            javax.swing.JOptionPane.YES_NO_OPTION
-    );
+        int result = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                "Bạn có muốn thoát ứng dụng không?",
+                "Xác nhận thoát",
+                javax.swing.JOptionPane.YES_NO_OPTION
+        );
 
     if (result == javax.swing.JOptionPane.YES_OPTION) {
         System.exit(0);
@@ -474,7 +449,6 @@ public class HomeForm extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
     private javax.swing.JLabel jLabel12;
-    private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel14;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
@@ -489,7 +463,6 @@ public class HomeForm extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel lblListenIcon;
     private javax.swing.JPanel pnlHeader;
-    private javax.swing.JTextField txtClientPort;
     private javax.swing.JTextField txtServerIP;
     private javax.swing.JTextField txtServerPort;
     // End of variables declaration//GEN-END:variables
