@@ -9,11 +9,13 @@ package com.voip.server;
  *
  * @author nguye
  */
+import com.voip.protocol.AudioConstants;
+
 import java.util.Scanner;
 
 public class ServerMain {
     public static void main(String[] args) {
-        int port = 8888; // Cổng UDP mặc định cho Server
+        int port = AudioConstants.DEFAULT_UDP_PORT;
         AudioServer server = new AudioServer(port);
         
         // Khởi động server và bắt đầu thu âm từ micro
