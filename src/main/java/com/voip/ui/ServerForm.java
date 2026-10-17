@@ -47,11 +47,9 @@ public class ServerForm extends javax.swing.JFrame {
         progressMicLevel = new javax.swing.JProgressBar();
         lblMicLevel = new javax.swing.JLabel();
         pnlWaveform = new javax.swing.JPanel();
-        jLabel4 = new javax.swing.JLabel();
+        jProgressBar2 = new javax.swing.JProgressBar();
         pnlDVR = new javax.swing.JPanel();
         jLabel5 = new javax.swing.JLabel();
-        pnlDvrWaveform = new javax.swing.JPanel();
-        jLabel6 = new javax.swing.JLabel();
         lblDvrStart = new javax.swing.JLabel();
         lblDvrCurrent = new javax.swing.JLabel();
         lblDvrEnd = new javax.swing.JLabel();
@@ -93,20 +91,19 @@ public class ServerForm extends javax.swing.JFrame {
         jPanel2Layout.setHorizontalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
-                .addGap(28, 28, 28)
-                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(lblUdpPort)
-                    .addComponent(lblServerStatus))
-                .addContainerGap(51, Short.MAX_VALUE))
+                .addContainerGap()
+                .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(lblServerStatus)
+                    .addComponent(lblUdpPort))
+                .addContainerGap(73, Short.MAX_VALUE))
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel2Layout.createSequentialGroup()
-                .addContainerGap()
                 .addComponent(lblServerStatus)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(lblUdpPort)
-                .addContainerGap(22, Short.MAX_VALUE))
+                .addContainerGap(34, Short.MAX_VALUE))
         );
 
         btnStartBroadcast.setBackground(new java.awt.Color(51, 102, 255));
@@ -252,23 +249,20 @@ public class ServerForm extends javax.swing.JFrame {
         pnlWaveform.setBackground(new java.awt.Color(0, 51, 102));
         pnlWaveform.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
 
-        jLabel4.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel4.setText("đây là vùng hiển thị dạng sóng hiện tại bỏ vào trong panel này");
-
         javax.swing.GroupLayout pnlWaveformLayout = new javax.swing.GroupLayout(pnlWaveform);
         pnlWaveform.setLayout(pnlWaveformLayout);
         pnlWaveformLayout.setHorizontalGroup(
             pnlWaveformLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(pnlWaveformLayout.createSequentialGroup()
-                .addGap(29, 29, 29)
-                .addComponent(jLabel4)
-                .addContainerGap(238, Short.MAX_VALUE))
+                .addGap(26, 26, 26)
+                .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 514, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(57, Short.MAX_VALUE))
         );
         pnlWaveformLayout.setVerticalGroup(
             pnlWaveformLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(pnlWaveformLayout.createSequentialGroup()
-                .addGap(21, 21, 21)
-                .addComponent(jLabel4)
+                .addGap(22, 22, 22)
+                .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -306,29 +300,6 @@ public class ServerForm extends javax.swing.JFrame {
         jLabel5.setForeground(new java.awt.Color(255, 255, 255));
         jLabel5.setText("BỘ ĐỆM LỊCH SỬ ÂM THANH (DVR)");
 
-        pnlDvrWaveform.setBackground(new java.awt.Color(0, 51, 102));
-        pnlDvrWaveform.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
-
-        jLabel6.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel6.setText("đây là vùng dạng sóng lịch sử bỏ vào trong panel này");
-
-        javax.swing.GroupLayout pnlDvrWaveformLayout = new javax.swing.GroupLayout(pnlDvrWaveform);
-        pnlDvrWaveform.setLayout(pnlDvrWaveformLayout);
-        pnlDvrWaveformLayout.setHorizontalGroup(
-            pnlDvrWaveformLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(pnlDvrWaveformLayout.createSequentialGroup()
-                .addGap(274, 274, 274)
-                .addComponent(jLabel6)
-                .addContainerGap(616, Short.MAX_VALUE))
-        );
-        pnlDvrWaveformLayout.setVerticalGroup(
-            pnlDvrWaveformLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(pnlDvrWaveformLayout.createSequentialGroup()
-                .addGap(29, 29, 29)
-                .addComponent(jLabel6)
-                .addContainerGap(55, Short.MAX_VALUE))
-        );
-
         lblDvrStart.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         lblDvrStart.setForeground(new java.awt.Color(255, 255, 255));
         lblDvrStart.setText("00:00");
@@ -350,6 +321,11 @@ public class ServerForm extends javax.swing.JFrame {
         btnPlayHistory.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         btnPlayHistory.setForeground(new java.awt.Color(255, 255, 255));
         btnPlayHistory.setText("Phát đoạn đã lưu");
+        btnPlayHistory.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnPlayHistoryActionPerformed(evt);
+            }
+        });
 
         btnClearHistory.setBackground(new java.awt.Color(255, 51, 51));
         btnClearHistory.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
@@ -368,30 +344,29 @@ public class ServerForm extends javax.swing.JFrame {
             .addGroup(pnlDVRLayout.createSequentialGroup()
                 .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(pnlDVRLayout.createSequentialGroup()
-                        .addGap(17, 17, 17)
-                        .addComponent(jLabel5))
-                    .addGroup(pnlDVRLayout.createSequentialGroup()
-                        .addGap(49, 49, 49)
-                        .addComponent(sliderDvrSeek, javax.swing.GroupLayout.PREFERRED_SIZE, 384, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(66, 66, 66)
-                        .addComponent(btnRewind5s, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(btnPlayHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 126, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(btnClearHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(89, 89, 89)
-                        .addComponent(lblDvrDuration))
-                    .addGroup(pnlDVRLayout.createSequentialGroup()
-                        .addContainerGap()
-                        .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(pnlDvrWaveform, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(pnlDVRLayout.createSequentialGroup()
-                                .addGap(6, 6, 6)
-                                .addComponent(lblDvrStart)
-                                .addGap(484, 484, 484)
-                                .addComponent(lblDvrCurrent)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(lblDvrEnd)))))
+                                .addGap(276, 276, 276)
+                                .addComponent(lblDvrCurrent))
+                            .addGroup(pnlDVRLayout.createSequentialGroup()
+                                .addGap(28, 28, 28)
+                                .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(lblDvrDuration)
+                                    .addGroup(pnlDVRLayout.createSequentialGroup()
+                                        .addComponent(lblDvrStart)
+                                        .addGap(39, 39, 39)
+                                        .addComponent(sliderDvrSeek, javax.swing.GroupLayout.PREFERRED_SIZE, 384, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(26, 26, 26)
+                                        .addComponent(lblDvrEnd)))))
+                        .addGap(96, 96, 96)
+                        .addComponent(btnRewind5s, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(38, 38, 38)
+                        .addComponent(btnPlayHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 126, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(36, 36, 36)
+                        .addComponent(btnClearHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(pnlDVRLayout.createSequentialGroup()
+                        .addGap(17, 17, 17)
+                        .addComponent(jLabel5)))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         pnlDVRLayout.setVerticalGroup(
@@ -399,21 +374,19 @@ public class ServerForm extends javax.swing.JFrame {
             .addGroup(pnlDVRLayout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(jLabel5)
-                .addGap(32, 32, 32)
-                .addComponent(pnlDvrWaveform, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(lblDvrCurrent)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lblDvrStart)
-                    .addComponent(lblDvrCurrent)
-                    .addComponent(lblDvrEnd))
-                .addGap(15, 15, 15)
-                .addGroup(pnlDVRLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(sliderDvrSeek, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnRewind5s, javax.swing.GroupLayout.PREFERRED_SIZE, 45, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnPlayHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 45, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(btnClearHistory, javax.swing.GroupLayout.PREFERRED_SIZE, 45, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(lblDvrDuration))
-                .addContainerGap(33, Short.MAX_VALUE))
+                    .addComponent(lblDvrEnd))
+                .addGap(30, 30, 30)
+                .addComponent(lblDvrDuration)
+                .addContainerGap(35, Short.MAX_VALUE))
         );
 
         pnlFooter.setBackground(new java.awt.Color(0, 51, 102));
@@ -441,7 +414,7 @@ public class ServerForm extends javax.swing.JFrame {
         pnlFooterLayout.setVerticalGroup(
             pnlFooterLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, pnlFooterLayout.createSequentialGroup()
-                .addContainerGap(24, Short.MAX_VALUE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(pnlFooterLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lblProtocol)
                     .addComponent(lblServerFooterStatus))
@@ -453,14 +426,14 @@ public class ServerForm extends javax.swing.JFrame {
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(pnlServerHeader, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(pnlFooter, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel1Layout.createSequentialGroup()
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
                         .addComponent(pnlClients, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(pnlMicMonitor, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                    .addComponent(pnlDVR, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(pnlDVR, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(pnlFooter, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -474,8 +447,8 @@ public class ServerForm extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(pnlDVR, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(pnlFooter, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(18, Short.MAX_VALUE))
+                .addComponent(pnlFooter, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -486,7 +459,9 @@ public class ServerForm extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGroup(layout.createSequentialGroup()
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 61, Short.MAX_VALUE))
         );
 
         pack();
@@ -508,6 +483,10 @@ public class ServerForm extends javax.swing.JFrame {
     btnStartBroadcast.setEnabled(true);
     btnStopBroadcast.setEnabled(false);
     }//GEN-LAST:event_btnStopBroadcastActionPerformed
+
+    private void btnPlayHistoryActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPlayHistoryActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_btnPlayHistoryActionPerformed
 
     /**
      * @param args the command line arguments
@@ -555,11 +534,10 @@ public class ServerForm extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
-    private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
-    private javax.swing.JLabel jLabel6;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
+    private javax.swing.JProgressBar jProgressBar2;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JLabel lblClientCount;
     private javax.swing.JLabel lblDvrCurrent;
@@ -574,7 +552,6 @@ public class ServerForm extends javax.swing.JFrame {
     private javax.swing.JLabel lblUdpPort;
     private javax.swing.JPanel pnlClients;
     private javax.swing.JPanel pnlDVR;
-    private javax.swing.JPanel pnlDvrWaveform;
     private javax.swing.JPanel pnlFooter;
     private javax.swing.JPanel pnlMicMonitor;
     private javax.swing.JPanel pnlServerHeader;

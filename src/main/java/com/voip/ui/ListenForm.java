@@ -14,8 +14,21 @@ public class ListenForm extends javax.swing.JFrame {
     /**
      * Creates new form ListenForm
      */
+    
+    private boolean isPlaying = false;
     public ListenForm() {
         initComponents();
+        sliderSeek.setMinimum(0);
+        sliderSeek.setMaximum(30);
+        sliderSeek.setValue(0);
+    }
+    private void updateSeekTime(int seconds) {
+        int minutes = seconds / 60;
+        int remainingSeconds = seconds % 60;
+
+        lblCurrentTime.setText(
+            String.format("%02d:%02d", minutes, remainingSeconds)
+        );
     }
 
     /**
@@ -42,14 +55,14 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel3 = new javax.swing.JPanel();
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
-        btnPause = new javax.swing.JButton();
-        btnPlay = new javax.swing.JButton();
-        btnStop = new javax.swing.JButton();
         jLabel9 = new javax.swing.JLabel();
         jComboBox1 = new javax.swing.JComboBox<>();
-        jSlider1 = new javax.swing.JSlider();
-        jLabel10 = new javax.swing.JLabel();
-        jLabel12 = new javax.swing.JLabel();
+        sliderSeek = new javax.swing.JSlider();
+        lblCurrentTime = new javax.swing.JLabel();
+        lblDuration = new javax.swing.JLabel();
+        btnPlayPause = new javax.swing.JButton();
+        btnBack10 = new javax.swing.JButton();
+        btnForward10 = new javax.swing.JButton();
         jPanel6 = new javax.swing.JPanel();
         jLabel13 = new javax.swing.JLabel();
         jPanel14 = new javax.swing.JPanel();
@@ -97,6 +110,7 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel20.setText("Tỷ lệ mất gói");
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setResizable(false);
 
         jPanel1.setBackground(new java.awt.Color(0, 0, 102));
 
@@ -212,36 +226,6 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel4.setForeground(new java.awt.Color(255, 255, 255));
         jLabel4.setText("nghe âm thanh từ Server (Nhiều người)");
 
-        btnPause.setBackground(new java.awt.Color(0, 102, 153));
-        btnPause.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        btnPause.setForeground(new java.awt.Color(255, 255, 255));
-        btnPause.setText("Tạm dừng");
-        btnPause.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnPauseActionPerformed(evt);
-            }
-        });
-
-        btnPlay.setBackground(new java.awt.Color(0, 102, 255));
-        btnPlay.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        btnPlay.setForeground(new java.awt.Color(255, 255, 255));
-        btnPlay.setText("Nghe");
-        btnPlay.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnPlayActionPerformed(evt);
-            }
-        });
-
-        btnStop.setBackground(new java.awt.Color(0, 102, 153));
-        btnStop.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        btnStop.setForeground(new java.awt.Color(255, 255, 255));
-        btnStop.setText("Dừng");
-        btnStop.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnStopActionPerformed(evt);
-            }
-        });
-
         jLabel9.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel9.setForeground(new java.awt.Color(255, 255, 255));
         jLabel9.setText("Nguồn âm thanh");
@@ -251,15 +235,45 @@ public class ListenForm extends javax.swing.JFrame {
         jComboBox1.setForeground(new java.awt.Color(255, 255, 255));
         jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Live Streaming (UDP)" }));
 
-        jSlider1.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        sliderSeek.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
 
-        jLabel10.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        jLabel10.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel10.setText("00:00");
+        lblCurrentTime.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblCurrentTime.setForeground(new java.awt.Color(255, 255, 255));
+        lblCurrentTime.setText("00:00");
 
-        jLabel12.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        jLabel12.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel12.setText("00:00");
+        lblDuration.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        lblDuration.setForeground(new java.awt.Color(255, 255, 255));
+        lblDuration.setText("00:00");
+
+        btnPlayPause.setBackground(new java.awt.Color(0, 102, 255));
+        btnPlayPause.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        btnPlayPause.setForeground(new java.awt.Color(255, 255, 255));
+        btnPlayPause.setText("Play");
+        btnPlayPause.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnPlayPauseActionPerformed(evt);
+            }
+        });
+
+        btnBack10.setBackground(new java.awt.Color(0, 102, 153));
+        btnBack10.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        btnBack10.setForeground(new java.awt.Color(255, 255, 255));
+        btnBack10.setText("Back 10 giây");
+        btnBack10.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnBack10ActionPerformed(evt);
+            }
+        });
+
+        btnForward10.setBackground(new java.awt.Color(0, 153, 255));
+        btnForward10.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        btnForward10.setForeground(new java.awt.Color(255, 255, 255));
+        btnForward10.setText("Next 10 giây");
+        btnForward10.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnForward10ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
@@ -270,15 +284,7 @@ public class ListenForm extends javax.swing.JFrame {
                     .addGroup(jPanel3Layout.createSequentialGroup()
                         .addGap(14, 14, 14)
                         .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(jPanel3Layout.createSequentialGroup()
-                                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel3Layout.createSequentialGroup()
-                                        .addComponent(btnPlay, javax.swing.GroupLayout.PREFERRED_SIZE, 125, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addComponent(btnPause, javax.swing.GroupLayout.PREFERRED_SIZE, 125, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                    .addComponent(jLabel3, javax.swing.GroupLayout.Alignment.LEADING))
-                                .addGap(42, 42, 42)
-                                .addComponent(btnStop, javax.swing.GroupLayout.PREFERRED_SIZE, 125, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(jLabel3)
                             .addComponent(jLabel4))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -286,11 +292,19 @@ public class ListenForm extends javax.swing.JFrame {
                             .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 309, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(jPanel3Layout.createSequentialGroup()
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(jLabel10)
+                        .addComponent(lblCurrentTime)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, 773, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jLabel12)))
+                        .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel3Layout.createSequentialGroup()
+                                .addComponent(btnBack10, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(38, 38, 38)
+                                .addComponent(btnPlayPause, javax.swing.GroupLayout.PREFERRED_SIZE, 103, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(41, 41, 41)
+                                .addComponent(btnForward10, javax.swing.GroupLayout.PREFERRED_SIZE, 111, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(jPanel3Layout.createSequentialGroup()
+                                .addComponent(sliderSeek, javax.swing.GroupLayout.PREFERRED_SIZE, 773, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(lblDuration)))))
                 .addGap(339, 339, 339))
         );
         jPanel3Layout.setVerticalGroup(
@@ -304,16 +318,16 @@ public class ListenForm extends javax.swing.JFrame {
                 .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel4)
                     .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGap(18, 18, 18)
+                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(btnPlayPause, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(btnBack10, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(btnForward10, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 21, Short.MAX_VALUE)
                 .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(btnPlay, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(btnPause, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(btnStop, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 31, Short.MAX_VALUE)
-                .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel10)
-                    .addComponent(jLabel12))
+                    .addComponent(sliderSeek, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(lblCurrentTime)
+                    .addComponent(lblDuration))
                 .addGap(23, 23, 23))
         );
 
@@ -328,7 +342,7 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel14.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel14.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblPacketsLost.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblPacketsLost.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsLost.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketsLost.setText("Gói mất: 0");
 
@@ -336,24 +350,24 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel14.setLayout(jPanel14Layout);
         jPanel14Layout.setHorizontalGroup(
             jPanel14Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel14Layout.createSequentialGroup()
-                .addContainerGap(28, Short.MAX_VALUE)
+            .addGroup(jPanel14Layout.createSequentialGroup()
+                .addGap(25, 25, 25)
                 .addComponent(lblPacketsLost)
-                .addGap(26, 26, 26))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel14Layout.setVerticalGroup(
             jPanel14Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel14Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(lblPacketsLost)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(38, Short.MAX_VALUE))
         );
 
         jPanel16.setBackground(new java.awt.Color(0, 51, 102));
         jPanel16.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel16.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblPacketsReceived.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblPacketsReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsReceived.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketsReceived.setText("Gói nhận: 0");
 
@@ -361,24 +375,24 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel16.setLayout(jPanel16Layout);
         jPanel16Layout.setHorizontalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel16Layout.createSequentialGroup()
-                .addGap(16, 16, 16)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel16Layout.createSequentialGroup()
+                .addContainerGap(32, Short.MAX_VALUE)
                 .addComponent(lblPacketsReceived)
-                .addContainerGap(44, Short.MAX_VALUE))
+                .addGap(28, 28, 28))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel16Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(lblPacketsReceived)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(43, Short.MAX_VALUE))
         );
 
         jPanel17.setBackground(new java.awt.Color(0, 51, 102));
         jPanel17.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel17.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblPacketLossRate.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblPacketLossRate.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketLossRate.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketLossRate.setText("Tỷ lệ mất gói: 0.00%");
 
@@ -386,24 +400,23 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel17.setLayout(jPanel17Layout);
         jPanel17Layout.setHorizontalGroup(
             jPanel17Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel17Layout.createSequentialGroup()
-                .addContainerGap()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel17Layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(lblPacketLossRate)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
         );
         jPanel17Layout.setVerticalGroup(
             jPanel17Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel17Layout.createSequentialGroup()
-                .addContainerGap()
                 .addComponent(lblPacketLossRate)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(0, 0, Short.MAX_VALUE))
         );
 
         jPanel18.setBackground(new java.awt.Color(0, 51, 102));
         jPanel18.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel18.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblLatency.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblLatency.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblLatency.setForeground(new java.awt.Color(255, 255, 255));
         lblLatency.setText("Latency(ms): --ms");
 
@@ -417,28 +430,27 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel18Layout.createSequentialGroup()
                 .addGroup(jPanel18Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel18Layout.createSequentialGroup()
-                        .addGap(17, 17, 17)
-                        .addComponent(lblLatency))
-                    .addGroup(jPanel18Layout.createSequentialGroup()
                         .addGap(31, 31, 31)
-                        .addComponent(jLabel27)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addComponent(jLabel27))
+                    .addGroup(jPanel18Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(lblLatency)))
+                .addContainerGap(17, Short.MAX_VALUE))
         );
         jPanel18Layout.setVerticalGroup(
             jPanel18Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel18Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(lblLatency)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jLabel27)
-                .addContainerGap(26, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 38, Short.MAX_VALUE)
+                .addComponent(jLabel27))
         );
 
         jPanel19.setBackground(new java.awt.Color(0, 51, 102));
         jPanel19.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel19.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblJitter.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblJitter.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblJitter.setForeground(new java.awt.Color(255, 255, 255));
         lblJitter.setText("Jitter(ms): --ms");
 
@@ -447,16 +459,16 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel19Layout.setHorizontalGroup(
             jPanel19Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel19Layout.createSequentialGroup()
-                .addGap(15, 15, 15)
+                .addContainerGap()
                 .addComponent(lblJitter)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(32, Short.MAX_VALUE))
         );
         jPanel19Layout.setVerticalGroup(
             jPanel19Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel19Layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(lblJitter)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(38, Short.MAX_VALUE))
         );
 
         jLabel23.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
@@ -467,7 +479,7 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel20.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 153)));
         jPanel20.setForeground(new java.awt.Color(0, 51, 102));
 
-        lblBytesReceived.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
+        lblBytesReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblBytesReceived.setForeground(new java.awt.Color(255, 255, 255));
         lblBytesReceived.setText("Dung lượng: 0kb");
 
@@ -478,14 +490,13 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel20Layout.createSequentialGroup()
                 .addGap(16, 16, 16)
                 .addComponent(lblBytesReceived)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(17, Short.MAX_VALUE))
         );
         jPanel20Layout.setVerticalGroup(
             jPanel20Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel20Layout.createSequentialGroup()
-                .addContainerGap()
                 .addComponent(lblBytesReceived)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(0, 44, Short.MAX_VALUE))
         );
 
         jLabel31.setForeground(new java.awt.Color(255, 255, 255));
@@ -496,6 +507,8 @@ public class ListenForm extends javax.swing.JFrame {
         lblJitterBuffer.setForeground(new java.awt.Color(255, 255, 255));
         lblJitterBuffer.setText("Jitter Buffer: 50 ms");
 
+        btnResetStats.setBackground(new java.awt.Color(0, 51, 255));
+        btnResetStats.setForeground(new java.awt.Color(255, 255, 255));
         btnResetStats.setText("Đặt lại thống kê");
         btnResetStats.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -518,63 +531,73 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel6Layout.setHorizontalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
-                .addGap(12, 12, 12)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
                     .addGroup(jPanel6Layout.createSequentialGroup()
-                        .addGap(6, 6, 6)
+                        .addGap(18, 18, 18)
                         .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(jLabel11)
+                            .addComponent(jLabel23)
                             .addGroup(jPanel6Layout.createSequentialGroup()
                                 .addComponent(jLabel31)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(cboJitterBuffer, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(lblJitterBuffer)
-                                .addGap(28, 28, 28)
-                                .addComponent(btnResetStats))
-                            .addGroup(jPanel6Layout.createSequentialGroup()
-                                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                    .addComponent(jPanel16, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(jLabel23))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jPanel14, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
-                                .addComponent(jPanel17, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(29, 29, 29)
-                                .addComponent(jPanel18, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
-                                .addComponent(jPanel19, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
-                                .addComponent(jPanel20, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 741, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                    .addComponent(jLabel13))
+                                .addComponent(lblJitterBuffer))
+                            .addComponent(jLabel13)
+                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 589, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addGap(26, 26, 26)
+                        .addComponent(jLabel11)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(btnResetStats)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                        .addComponent(jPanel14, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(jPanel16, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(jPanel19, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(48, 48, 48)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jPanel20, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jPanel17, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jPanel18, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel6Layout.setVerticalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
-                .addComponent(jLabel13)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jPanel14, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel17, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel18, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel19, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel20, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(jPanel16, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jLabel23)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jLabel31)
-                    .addComponent(cboJitterBuffer, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(lblJitterBuffer)
-                    .addComponent(btnResetStats))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jLabel11)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 115, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(49, 49, 49))
+                .addGap(0, 22, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addComponent(jLabel13)
+                        .addGap(18, 18, 18)
+                        .addComponent(jLabel23)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 21, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel31)
+                            .addComponent(cboJitterBuffer, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblJitterBuffer)))
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                        .addComponent(jPanel16, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(jPanel17, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel20, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel14, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(40, 40, 40)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel19, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel18, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addGap(0, 10, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(btnResetStats, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel11))
+                        .addGap(18, 18, 18)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 157, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(94, 94, 94))))
         );
 
         jPanel7.setBackground(new java.awt.Color(0, 51, 102));
@@ -587,7 +610,7 @@ public class ListenForm extends javax.swing.JFrame {
         sliderVolume.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
 
         btnVolumeDown.setBackground(new java.awt.Color(0, 51, 102));
-        btnVolumeDown.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
+        btnVolumeDown.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeDown.setForeground(new java.awt.Color(255, 255, 255));
         btnVolumeDown.setText("-");
         btnVolumeDown.addActionListener(new java.awt.event.ActionListener() {
@@ -604,7 +627,7 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel18.setText("Cường độ âm thanh (Input level)");
 
         btnVolumeUp.setBackground(new java.awt.Color(0, 51, 102));
-        btnVolumeUp.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
+        btnVolumeUp.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeUp.setForeground(new java.awt.Color(255, 255, 255));
         btnVolumeUp.setText("+");
         btnVolumeUp.addActionListener(new java.awt.event.ActionListener() {
@@ -631,9 +654,9 @@ public class ListenForm extends javax.swing.JFrame {
                     .addComponent(jLabel16))
                 .addGap(36, 36, 36)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 203, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel18))
-                .addContainerGap(235, Short.MAX_VALUE))
+                    .addComponent(jLabel18)
+                    .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 342, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(110, Short.MAX_VALUE))
         );
         jPanel7Layout.setVerticalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -679,7 +702,7 @@ public class ListenForm extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, 338, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(26, Short.MAX_VALUE))
         );
 
@@ -687,24 +710,15 @@ public class ListenForm extends javax.swing.JFrame {
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 901, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 314, Short.MAX_VALUE))
+            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, 1101, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 23, Short.MAX_VALUE))
+            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
-
-    private void btnPlayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPlayActionPerformed
-        // TODO add your handling code here:
-        txtLog.append("Yêu cầu bắt đầu nghe âm thanh.\n");
-    }//GEN-LAST:event_btnPlayActionPerformed
 
     private void btnVolumeUpActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnVolumeUpActionPerformed
         // TODO add your handling code here:
@@ -731,15 +745,45 @@ public class ListenForm extends javax.swing.JFrame {
         txtLog.append("Đã yêu cầu đặt lại thống kê.\n");
     }//GEN-LAST:event_btnResetStatsActionPerformed
 
-    private void btnPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPauseActionPerformed
+    private void btnPlayPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPlayPauseActionPerformed
         // TODO add your handling code here:
-        txtLog.append("Yêu cầu tạm dừng phát âm thanh.\n");
-    }//GEN-LAST:event_btnPauseActionPerformed
+    if (!isPlaying) {
+        isPlaying = true;
+        btnPlayPause.setText("Tạm dừng");
+        btnPlayPause.setBackground(new java.awt.Color(0, 102, 255));
+    } else {
+        isPlaying = false;
+        btnPlayPause.setText("Phát");
+        btnPlayPause.setBackground(java.awt.Color.RED);
+    }
+        
+    }//GEN-LAST:event_btnPlayPauseActionPerformed
 
-    private void btnStopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStopActionPerformed
+    private void btnBack10ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBack10ActionPerformed
         // TODO add your handling code here:
-        txtLog.append("Yêu cầu dừng nghe âm thanh.\n");
-    }//GEN-LAST:event_btnStopActionPerformed
+    int current = sliderSeek.getValue();
+
+    int target = Math.max(
+            sliderSeek.getMinimum(),
+            current - 10
+    );
+
+    sliderSeek.setValue(target);
+    updateSeekTime(target);
+    }//GEN-LAST:event_btnBack10ActionPerformed
+
+    private void btnForward10ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnForward10ActionPerformed
+        // TODO add your handling code here:
+        int current = sliderSeek.getValue();
+
+        int target = Math.min(
+               sliderSeek.getMaximum(),
+               current + 10
+       );
+
+       sliderSeek.setValue(target);
+       updateSeekTime(target);
+    }//GEN-LAST:event_btnForward10ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -777,18 +821,16 @@ public class ListenForm extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JButton btnPause;
-    private javax.swing.JButton btnPlay;
+    private javax.swing.JButton btnBack10;
+    private javax.swing.JButton btnForward10;
+    private javax.swing.JButton btnPlayPause;
     private javax.swing.JButton btnResetStats;
-    private javax.swing.JButton btnStop;
     private javax.swing.JButton btnVolumeDown;
     private javax.swing.JButton btnVolumeUp;
     private javax.swing.JComboBox<String> cboJitterBuffer;
     private javax.swing.JComboBox<String> jComboBox1;
     private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
-    private javax.swing.JLabel jLabel12;
     private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel16;
     private javax.swing.JLabel jLabel17;
@@ -821,14 +863,16 @@ public class ListenForm extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel7;
     private javax.swing.JProgressBar jProgressBar2;
     private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JSlider jSlider1;
     private javax.swing.JLabel lblBytesReceived;
+    private javax.swing.JLabel lblCurrentTime;
+    private javax.swing.JLabel lblDuration;
     private javax.swing.JLabel lblJitter;
     private javax.swing.JLabel lblJitterBuffer;
     private javax.swing.JLabel lblLatency;
     private javax.swing.JLabel lblPacketLossRate;
     private javax.swing.JLabel lblPacketsLost;
     private javax.swing.JLabel lblPacketsReceived;
+    private javax.swing.JSlider sliderSeek;
     private javax.swing.JSlider sliderVolume;
     private javax.swing.JTextArea txtLog;
     // End of variables declaration//GEN-END:variables
