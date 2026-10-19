@@ -4,102 +4,131 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-/**
- * Gói RTP rút gọn dùng cho UDP audio.
- *
- * <pre>
- * Offset  Size  Field
- * 0       1     version = 1
- * 1       1     type    LIVE=1 | HISTORY=2 | CONTROL=3
- * 2       2     sequence (unsigned short, big-endian)
- * 4       4     timestampMs (int, big-endian)
- * 8       4     payloadLength
- * 12      N     payload
- * </pre>
- */
-public class RTPPacket {
-
-    public static final byte VERSION = 1;
-    public static final byte TYPE_LIVE = 1;
-    public static final byte TYPE_HISTORY = 2;
-    public static final byte TYPE_CONTROL = 3;
+/** RTP version 2 packet with a fixed 12-byte header and no CSRC list or extensions. */
+public final class RTPPacket {
     public static final int HEADER_SIZE = 12;
+    public static final int PAYLOAD_TYPE_ULAW = 0;
+    public static final int PAYLOAD_TYPE_PCM = 96;
+    private static final int VERSION = 2;
 
-    private final byte version;
-    private final byte type;
+    private final int payloadType;
     private final int sequence;
-    private final int timestampMs;
+    private final int timestamp;
+    private final long ssrc;
     private final byte[] payload;
+    private final byte[] headerBytes;
+    private final byte[] paddingBytes;
 
-    public RTPPacket(byte type, int sequence, int timestampMs, byte[] payload, int payloadLength) {
-        this.version = VERSION;
-        this.type = type;
-        this.sequence = sequence & 0xFFFF;
-        this.timestampMs = timestampMs;
-        if (payload == null || payloadLength <= 0) {
-            this.payload = new byte[0];
-        } else {
-            this.payload = Arrays.copyOf(payload, payloadLength);
+    public RTPPacket(int payloadType, int sequence, int timestamp, long ssrc, byte[] payload) {
+        if (payloadType < 0 || payloadType > 127 || payload == null) {
+            throw new IllegalArgumentException("Thông tin RTP không hợp lệ.");
         }
+        this.payloadType = payloadType;
+        this.sequence = sequence & 0xFFFF;
+        this.timestamp = timestamp;
+        this.ssrc = ssrc & 0xFFFF_FFFFL;
+        this.payload = payload.clone();
+        this.headerBytes = createHeader(payloadType, this.sequence, timestamp, this.ssrc);
+        this.paddingBytes = new byte[0];
+    }
+
+    private RTPPacket(int payloadType, int sequence, int timestamp, long ssrc,
+                      byte[] payload, byte[] headerBytes, byte[] paddingBytes) {
+        this.payloadType = payloadType;
+        this.sequence = sequence;
+        this.timestamp = timestamp;
+        this.ssrc = ssrc;
+        this.payload = payload;
+        this.headerBytes = headerBytes;
+        this.paddingBytes = paddingBytes;
     }
 
     public byte[] encode() {
-        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + payload.length).order(ByteOrder.BIG_ENDIAN);
-        buffer.put(version);
-        buffer.put(type);
-        buffer.putShort((short) sequence);
-        buffer.putInt(timestampMs);
-        buffer.putInt(payload.length);
+        byte[] packet = new byte[headerBytes.length + payload.length + paddingBytes.length];
+        ByteBuffer buffer = ByteBuffer.wrap(packet).order(ByteOrder.BIG_ENDIAN);
+        buffer.put(headerBytes);
         buffer.put(payload);
-        return buffer.array();
+        buffer.put(paddingBytes);
+        return packet;
     }
 
-    /**
-     * @return packet hợp lệ, hoặc {@code null} nếu dữ liệu hỏng / không đủ header
-     */
+    public byte[] getHeaderBytes() {
+        return headerBytes.clone();
+    }
+
+    private static byte[] createHeader(int payloadType, int sequence, int timestamp, long ssrc) {
+        ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
+        header.put((byte) (VERSION << 6));
+        header.put((byte) payloadType);
+        header.putShort((short) sequence);
+        header.putInt(timestamp);
+        header.putInt((int) ssrc);
+        return header.array();
+    }
+
     public static RTPPacket decode(byte[] raw, int length) {
-        if (raw == null || length < HEADER_SIZE) {
+        if (raw == null || length < HEADER_SIZE || length > raw.length) {
             return null;
         }
         ByteBuffer buffer = ByteBuffer.wrap(raw, 0, length).order(ByteOrder.BIG_ENDIAN);
-        byte version = buffer.get();
-        if (version != VERSION) {
+        int first = Byte.toUnsignedInt(buffer.get());
+        int version = first >>> 6;
+        boolean hasPadding = (first & 0x20) != 0;
+        boolean hasExtension = (first & 0x10) != 0;
+        int csrcCount = first & 0x0F;
+        if (version != VERSION || length < HEADER_SIZE + csrcCount * Integer.BYTES) {
             return null;
         }
-        byte type = buffer.get();
+        int payloadType = Byte.toUnsignedInt(buffer.get()) & 0x7F;
         int sequence = Short.toUnsignedInt(buffer.getShort());
-        int timestampMs = buffer.getInt();
-        int payloadLength = buffer.getInt();
-        if (payloadLength < 0 || HEADER_SIZE + payloadLength > length) {
-            return null;
+        int timestamp = buffer.getInt();
+        long ssrc = Integer.toUnsignedLong(buffer.getInt());
+        int headerLength = HEADER_SIZE + csrcCount * Integer.BYTES;
+        if (hasExtension) {
+            if (length < headerLength + 4) {
+                return null;
+            }
+            int extensionWords = Short.toUnsignedInt(
+                    ByteBuffer.wrap(raw, headerLength + 2, 2).order(ByteOrder.BIG_ENDIAN).getShort());
+            long extendedHeaderLength = (long) headerLength + 4L + (long) extensionWords * Integer.BYTES;
+            if (extendedHeaderLength > length) {
+                return null;
+            }
+            headerLength = (int) extendedHeaderLength;
         }
-        byte[] payload = new byte[payloadLength];
+        int payloadEnd = length;
+        if (hasPadding) {
+            int paddingLength = Byte.toUnsignedInt(raw[length - 1]);
+            if (paddingLength == 0 || paddingLength > length - headerLength) {
+                return null;
+            }
+            payloadEnd -= paddingLength;
+        }
+        buffer.position(headerLength);
+        byte[] payload = new byte[payloadEnd - headerLength];
         buffer.get(payload);
-        return new RTPPacket(type, sequence, timestampMs, payload, payloadLength);
+        return new RTPPacket(payloadType, sequence, timestamp, ssrc, payload,
+                Arrays.copyOf(raw, headerLength), Arrays.copyOfRange(raw, payloadEnd, length));
     }
 
-    public RTPPacket withType(byte newType) {
-        return new RTPPacket(newType, sequence, timestampMs, payload, payload.length);
-    }
-
-    public byte getVersion() {
-        return version;
-    }
-
-    public byte getType() {
-        return type;
+    public int getPayloadType() {
+        return payloadType;
     }
 
     public int getSequence() {
         return sequence;
     }
 
-    public int getTimestampMs() {
-        return timestampMs;
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public long getSsrc() {
+        return ssrc;
     }
 
     public byte[] getPayload() {
-        return payload;
+        return Arrays.copyOf(payload, payload.length);
     }
 
     public int getPayloadLength() {

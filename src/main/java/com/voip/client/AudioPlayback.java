@@ -1,7 +1,9 @@
 package com.voip.client;
 
 import com.voip.buffer.JitterBuffer;
+import com.voip.buffer.JitterBuffer;
 import com.voip.protocol.AudioConstants;
+import com.voip.protocol.RTPPacket;
 import com.voip.protocol.RTPPacket;
 
 import javax.sound.sampled.AudioFormat;
@@ -193,10 +195,13 @@ public class AudioPlayback implements Runnable {
     }
 
     public synchronized void pausePlayback() {
+    public synchronized void pausePlayback() {
         playing = false;
+        jitterBuffer.clear();
         jitterBuffer.clear();
         if (speakers != null) {
             speakers.stop();
+            speakers.flush();
             speakers.flush();
         }
     }
@@ -214,11 +219,33 @@ public class AudioPlayback implements Runnable {
             playbackThread = new Thread(this, "Audio-Playback-Thread");
             playbackThread.setDaemon(true);
             playbackThread.start();
+    public synchronized void resumePlayback() throws LineUnavailableException {
+        if (stopped || playing) {
+            return;
+        }
+        if (speakers == null || !speakers.isOpen()) {
+            initLine();
+        }
+        speakers.start();
+        playing = true;
+        if (playbackThread == null || !playbackThread.isAlive()) {
+            playbackThread = new Thread(this, "Audio-Playback-Thread");
+            playbackThread.setDaemon(true);
+            playbackThread.start();
         }
     }
 
     public synchronized void stopPlayback() {
+    public synchronized void stopPlayback() {
         playing = false;
+        stopped = true;
+        SourceDataLine line = speakers;
+        speakers = null;
+        if (line != null) {
+            line.stop();
+            line.flush();
+            line.close();
+        }
         stopped = true;
         SourceDataLine line = speakers;
         speakers = null;
@@ -251,22 +278,26 @@ public class AudioPlayback implements Runnable {
     @Override
     public void run() {
         try {
-            while (playing) {
-                // Lấy gói tin tiếp theo từ Jitter Buffer
+            while (!stopped) {
+                if (!playing) {
+                    Thread.sleep(10);
+                    continue;
+                }
                 RTPPacket packet = jitterBuffer.getNextPacket();
-                if (packet != null && packet.getPayload() != null) {
+                SourceDataLine line = speakers;
+                if (packet != null && line != null && line.isOpen()) {
                     byte[] audioData = packet.getPayload();
-                    speakers.write(audioData, 0, audioData.length);
+                    if (audioData.length > 0) {
+                        line.write(audioData, 0, audioData.length);
+                    }
                 } else {
-                    // Nếu buffer trống (underrun), tạm nghỉ ngắn để tránh chiếm CPU
-                    Thread.sleep(5);
+                    Thread.sleep(2);
                 }
             }
         } catch (InterruptedException e) {
-            // Luồng bị ngắt khi dừng
             Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Lỗi trong luồng phát âm thanh", e);
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.SEVERE, "Lỗi trong luồng phát âm thanh.", e);
         }
     }
 

@@ -1,13 +1,5 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.voip.ui;
 
-/**
- *
- * @author nguye
- */
-public class MainFrame {
-    
+/** Kept as an alternate application entry point for IDE launch configurations. */
+public class MainFrame extends HomeForm {
 }
