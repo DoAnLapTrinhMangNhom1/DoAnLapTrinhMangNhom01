@@ -1,9 +1,8 @@
 package com.voip.client;
 
 import com.voip.buffer.JitterBuffer;
-import com.voip.buffer.JitterBuffer;
 import com.voip.protocol.AudioConstants;
-import com.voip.protocol.RTPPacket;
+import com.voip.protocol.AudioLevel;
 import com.voip.protocol.RTPPacket;
 
 import javax.sound.sampled.AudioFormat;
@@ -31,6 +30,8 @@ public class AudioPlayback implements Runnable {
     private volatile Mixer.Info selectedMixer;
     private volatile DeviceChangeListener deviceChangeListener;
     private volatile int currentVolumePercent = 100;
+    private volatile int outputLevelPercent;
+    private volatile long lastAudioWriteNanos;
     private List<Mixer.Info> lastKnownSpeakers = new ArrayList<>();
     private Thread playbackThread;
 
@@ -155,6 +156,13 @@ public class AudioPlayback implements Runnable {
         return currentVolumePercent;
     }
 
+    public int getOutputLevelPercent() {
+        if (!playing || System.nanoTime() - lastAudioWriteNanos > 500_000_000L) {
+            return 0;
+        }
+        return outputLevelPercent;
+    }
+
     private void initLine() throws LineUnavailableException {
         DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
 
@@ -195,14 +203,12 @@ public class AudioPlayback implements Runnable {
     }
 
     public synchronized void pausePlayback() {
-    public synchronized void pausePlayback() {
         playing = false;
-        jitterBuffer.clear();
+        outputLevelPercent = 0;
         jitterBuffer.clear();
         if (speakers != null) {
             speakers.stop();
             speakers.flush();
-            speakers.flush();
         }
     }
 
@@ -219,34 +225,13 @@ public class AudioPlayback implements Runnable {
             playbackThread = new Thread(this, "Audio-Playback-Thread");
             playbackThread.setDaemon(true);
             playbackThread.start();
-    public synchronized void resumePlayback() throws LineUnavailableException {
-        if (stopped || playing) {
-            return;
-        }
-        if (speakers == null || !speakers.isOpen()) {
-            initLine();
-        }
-        speakers.start();
-        playing = true;
-        if (playbackThread == null || !playbackThread.isAlive()) {
-            playbackThread = new Thread(this, "Audio-Playback-Thread");
-            playbackThread.setDaemon(true);
-            playbackThread.start();
         }
     }
 
-    public synchronized void stopPlayback() {
     public synchronized void stopPlayback() {
         playing = false;
         stopped = true;
-        SourceDataLine line = speakers;
-        speakers = null;
-        if (line != null) {
-            line.stop();
-            line.flush();
-            line.close();
-        }
-        stopped = true;
+        outputLevelPercent = 0;
         SourceDataLine line = speakers;
         speakers = null;
         if (line != null) {
@@ -278,26 +263,29 @@ public class AudioPlayback implements Runnable {
     @Override
     public void run() {
         try {
-            while (!stopped) {
-                if (!playing) {
-                    Thread.sleep(10);
-                    continue;
-                }
+            while (playing) {
+                // Lấy gói tin tiếp theo từ Jitter Buffer
                 RTPPacket packet = jitterBuffer.getNextPacket();
-                SourceDataLine line = speakers;
-                if (packet != null && line != null && line.isOpen()) {
+                if (packet != null && packet.getPayload() != null) {
                     byte[] audioData = packet.getPayload();
-                    if (audioData.length > 0) {
-                        line.write(audioData, 0, audioData.length);
+                    SourceDataLine line = speakers;
+                    if (line != null && line.isOpen()) {
+                        int written = line.write(audioData, 0, audioData.length);
+                        if (written > 0) {
+                            outputLevelPercent = AudioLevel.rmsPercent(audioData, written);
+                            lastAudioWriteNanos = System.nanoTime();
+                        }
                     }
                 } else {
-                    Thread.sleep(2);
+                    // Nếu buffer trống (underrun), tạm nghỉ ngắn để tránh chiếm CPU
+                    Thread.sleep(5);
                 }
             }
         } catch (InterruptedException e) {
+            // Luồng bị ngắt khi dừng
             Thread.currentThread().interrupt();
-        } catch (RuntimeException e) {
-            LOGGER.log(Level.SEVERE, "Lỗi trong luồng phát âm thanh.", e);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Lỗi trong luồng phát âm thanh", e);
         }
     }
 

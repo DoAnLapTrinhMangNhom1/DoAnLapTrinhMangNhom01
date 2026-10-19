@@ -17,6 +17,8 @@ java -jar target\VoipAudioStreaming-1.0-SNAPSHOT.jar
 
 Ở màn hình chính, nhập IP của server và cổng UDP (mặc định `8888`). Mở **Phát âm thanh** trên máy server, chọn microphone trong danh sách thiết bị đầu vào hoặc chọn tệp WAV; trên từng máy client, nhập cùng IP/cổng và chọn **Bắt đầu nghe**. Server chỉ gửi luồng sau khi client JOIN và hai đầu thương lượng thành công cùng codec/chế độ mã hóa. Khi đóng cửa sổ client, client gửi LEAVE để server bỏ địa chỉ khỏi danh sách.
 
+Chọn thiết bị đầu vào trên server trước khi bắt đầu phát. Danh sách thiết bị bị khóa trong khi server đang phát; dừng phát để chọn thiết bị khác rồi khởi động lại. Khi phát WAV, danh sách microphone cũng bị khóa. Server hiển thị mức RMS của tín hiệu đầu vào; client hiển thị mức RMS của dữ liệu âm thanh đang đưa ra thiết bị phát.
+
 Hai ứng dụng phải dùng cùng một codec và cùng khóa mã hóa (hoặc đều không đặt khóa). Cấu hình bằng system properties khi khởi chạy:
 
 ```powershell

@@ -2,6 +2,7 @@ package com.voip.server;
 
 import com.voip.protocol.AudioConstants;
 import com.voip.protocol.AudioCrypto;
+import com.voip.protocol.AudioLevel;
 import com.voip.protocol.ControlMessage;
 import com.voip.protocol.G711Codec;
 import com.voip.protocol.RTPPacket;
@@ -44,6 +45,9 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     private final AtomicInteger timestamp = new AtomicInteger(RANDOM.nextInt());
     private final AtomicLong packetsSent = new AtomicLong();
     private final AtomicLong bytesSent = new AtomicLong();
+    private final AtomicLong audioFramesCaptured = new AtomicLong();
+    private final AtomicInteger inputLevelPercent = new AtomicInteger();
+    private volatile long lastAudioFrameNanos;
     private final String codec;
     private final int payloadType;
     private final String encryptionKey;
@@ -52,6 +56,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     private volatile DatagramSocket serverSocket;
     private volatile boolean running;
     private volatile boolean audioSourceEnded;
+    private volatile String audioCaptureError;
 
     public AudioServer(int port) {
         this(port, null, null);
@@ -96,7 +101,9 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         ssrc = Integer.toUnsignedLong(RANDOM.nextInt());
         packetsSent.set(0);
         bytesSent.set(0);
+        audioFramesCaptured.set(0);
         audioSourceEnded = false;
+        audioCaptureError = null;
         running = true;
         try {
             if (wavFile == null) {
@@ -199,6 +206,9 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         if (!running || data == null || length <= 0 || length > data.length) {
             return;
         }
+        audioFramesCaptured.incrementAndGet();
+        inputLevelPercent.set(AudioLevel.rmsPercent(data, length));
+        lastAudioFrameNanos = System.nanoTime();
         int seq = sequence.getAndIncrement() & 0xFFFF;
         int ts = timestamp.getAndAdd(SAMPLES_PER_FRAME);
         try {
@@ -215,6 +225,11 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         } catch (GeneralSecurityException e) {
             LOGGER.log(Level.SEVERE, "Không thể bảo vệ gói âm thanh.", e);
         }
+    }
+
+    @Override
+    public void onAudioCaptureFailed(IOException error) {
+        audioCaptureError = error.getMessage();
     }
 
     @Override
@@ -246,15 +261,20 @@ public class AudioServer implements AudioCapture.AudioDataListener {
 
     public synchronized void stopServer() {
         running = false;
-        audioCapture.stopCapture();
-        DatagramSocket socket = serverSocket;
-        serverSocket = null;
-        if (socket != null) {
-            socket.close();
+        try {
+            audioCapture.stopCapture();
+        } catch (IllegalStateException e) {
+            LOGGER.log(Level.SEVERE, "Không thể dừng hoàn toàn luồng thu âm.", e);
+        } finally {
+            DatagramSocket socket = serverSocket;
+            serverSocket = null;
+            if (socket != null) {
+                socket.close();
+            }
+            clients.clear();
+            lastClientActivity.clear();
+            LOGGER.info("Audio server đã dừng.");
         }
-        clients.clear();
-        lastClientActivity.clear();
-        LOGGER.info("Audio server đã dừng.");
     }
 
     public boolean isRunning() {
@@ -283,6 +303,21 @@ public class AudioServer implements AudioCapture.AudioDataListener {
 
     public long getBytesSent() {
         return bytesSent.get();
+    }
+
+    public long getAudioFramesCaptured() {
+        return audioFramesCaptured.get();
+    }
+
+    public int getInputLevelPercent() {
+        if (!running || System.nanoTime() - lastAudioFrameNanos > 500_000_000L) {
+            return 0;
+        }
+        return inputLevelPercent.get();
+    }
+
+    public String getAudioCaptureError() {
+        return audioCaptureError;
     }
 
     public String getCodec() {
