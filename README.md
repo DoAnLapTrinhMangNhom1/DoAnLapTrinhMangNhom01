@@ -51,9 +51,9 @@ Mặc định là PCM signed 16-bit, mono, 16 kHz, big-endian; mỗi gói gồm 
 
 Thông tin thành viên và công việc được tổng hợp theo bảng phân công/đánh giá của nhóm. Bổ sung số hoặc liên kết Merge Request tương ứng trước khi nộp.
 
-| MSSV | Họ và Tên | Công việc đã thực hiện | Merge Requests |
-|---|---|---|---|
-| 2380601558 | Phạm Minh Nhật | Xây dựng và xử lý logic phía client.<br>Bổ sung, sửa chữa lớp `JitterBuffer`. | Chưa cập nhật |
-| 2380601059 | Nguyễn Anh Khoa | Xây dựng và xử lý logic phía server.<br>Xây dựng package protocol, gồm RTP, G.711 và các thành phần liên quan. | Chưa cập nhật |
-| 2380600860 | Nguyễn Quốc Huy | Thiết kế UI/UX cho server và client.<br>Kết nối, xử lý các logic cơ bản giữa giao diện và chương trình. | Chưa cập nhật |
-| 2380600125 | Đặng Quốc Bảo | Xây dựng lớp `JitterBuffer`.<br>Hỗ trợ thiết kế Canva. | Chưa cập nhật |
+| MSSV | Họ và Tên | Công việc đã thực hiện
+|---|---|---|
+| 2380601558 | Phạm Minh Nhật | Xây dựng và xử lý logic phía client.<br>Bổ sung, sửa chữa lớp `JitterBuffer`. |
+| 2380601059 | Nguyễn Anh Khoa | Xây dựng và xử lý logic phía server.<br>Xây dựng package protocol, gồm RTP, G.711 và các thành phần liên quan. |
+| 2380600860 | Nguyễn Quốc Huy | Thiết kế UI/UX cho server và client.<br>Kết nối, xử lý các logic cơ bản giữa giao diện và chương trình. |
+| 2380600125 | Đặng Quốc Bảo | Xây dựng lớp `JitterBuffer`.<br>Hỗ trợ thiết kế Canva. |
