@@ -10,7 +10,7 @@ import java.util.Arrays;
  * <pre>
  * Offset  Size  Field
  * 0       1     version = 1
- * 1       1     type    LIVE=1 | HISTORY=2 | CONTROL=3
+ * 1       1     type    LIVE=1 | CONTROL=3
  * 2       2     sequence (unsigned short, big-endian)
  * 4       4     timestampMs (int, big-endian)
  * 8       4     payloadLength
@@ -21,7 +21,6 @@ public class RTPPacket {
 
     public static final byte VERSION = 1;
     public static final byte TYPE_LIVE = 1;
-    public static final byte TYPE_HISTORY = 2;
     public static final byte TYPE_CONTROL = 3;
     public static final int HEADER_SIZE = 12;
 
@@ -32,11 +31,15 @@ public class RTPPacket {
     private final byte[] payload;
 
     public RTPPacket(byte type, int sequence, int timestampMs, byte[] payload, int payloadLength) {
+        if (payloadLength < 0 || (payload == null && payloadLength > 0)
+                || (payload != null && payloadLength > payload.length)) {
+            throw new IllegalArgumentException("Độ dài payload không hợp lệ.");
+        }
         this.version = VERSION;
         this.type = type;
         this.sequence = sequence & 0xFFFF;
         this.timestampMs = timestampMs;
-        if (payload == null || payloadLength <= 0) {
+        if (payloadLength == 0) {
             this.payload = new byte[0];
         } else {
             this.payload = Arrays.copyOf(payload, payloadLength);
@@ -70,16 +73,12 @@ public class RTPPacket {
         int sequence = Short.toUnsignedInt(buffer.getShort());
         int timestampMs = buffer.getInt();
         int payloadLength = buffer.getInt();
-        if (payloadLength < 0 || HEADER_SIZE + payloadLength > length) {
+        if (payloadLength < 0 || payloadLength > length - HEADER_SIZE) {
             return null;
         }
         byte[] payload = new byte[payloadLength];
         buffer.get(payload);
         return new RTPPacket(type, sequence, timestampMs, payload, payloadLength);
-    }
-
-    public RTPPacket withType(byte newType) {
-        return new RTPPacket(newType, sequence, timestampMs, payload, payload.length);
     }
 
     public byte getVersion() {

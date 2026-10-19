@@ -1,182 +1,227 @@
 package com.voip.buffer;
 
-import com.voip.protocol.RTPPacket;
 import com.voip.protocol.AudioConstants;
+import com.voip.protocol.RTPPacket;
 
-import java.util.TreeMap;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Jitter Buffer để làm mượt luồng audio bằng cách:
- * 1. Reorder gói theo sequence number
- * 2. Buffer gói trong một khoảng thời gian (50ms, 75ms, 100ms)
- * 3. Xử lý gói bị mất (gap)
- */
+/** Bounded, wrap-aware packet reorder buffer with a fixed playout delay. */
 public class JitterBuffer {
-    private TreeMap<Integer, RTPPacket> buffer;
-    private int nextExpectedSequence;
+    private static final long REORDER_GRACE_NANOS = 5_000_000L;
+    private final Map<Integer, RTPPacket> packets = new HashMap<>();
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition packetAvailable = lock.newCondition();
     private int bufferSizeMs;
-    private int maxPackets;
-    private final ReentrantLock lock;
+    private int capacity;
+    private int nextSequence = -1;
+    private boolean started;
+    private int payloadSize;
+    private byte[] lastPayload;
+    private int consecutiveLosses;
 
-    /**
-     * Constructor với buffer size mặc định 50ms
-     */
     public JitterBuffer() {
-        this(50);
+        this(AudioConstants.JITTER_BUFFER_MS);
     }
 
-    /**
-     * Constructor với buffer size tùy chỉnh
-     * @param bufferSizeMs Thời gian buffer (ms): 50, 75, 100
-     */
     public JitterBuffer(int bufferSizeMs) {
-        this.buffer = new TreeMap<>();
-        this.nextExpectedSequence = 0;
-        this.bufferSizeMs = bufferSizeMs;
-        this.maxPackets = bufferSizeMs / AudioConstants.FRAME_MS;
-        this.lock = new ReentrantLock();
+        setBufferSizeMs(bufferSizeMs);
     }
 
-    /**
-     * Thêm gói RTP vào buffer
-     * @param packet Gói RTP cần thêm
-     */
     public void addPacket(RTPPacket packet) {
-        if (packet == null) {
+        if (packet == null || packet.getType() != RTPPacket.TYPE_LIVE) {
             return;
         }
-
         lock.lock();
         try {
-            int seq = packet.getSequence();
-
-            // Xử lý trường hợp sequence number tràn (0xFFFF -> 0)
-            if (seq < nextExpectedSequence && (nextExpectedSequence - seq) > 1000) {
-                // Reset khi sequence quay lại từ 0
-                nextExpectedSequence = seq;
+            int sequence = packet.getSequence();
+            if (nextSequence == -1) {
+                nextSequence = sequence;
+            } else {
+                int distance = sequenceDifference(sequence, nextSequence);
+                if (packets.containsKey(sequence)) {
+                    return;
+                }
+                if (distance < 0) {
+                    if (started || distance < -capacity * 2) {
+                        return;
+                    }
+                    nextSequence = sequence;
+                } else if (distance >= capacity * 4) {
+                    return;
+                }
             }
-
-            // Nếu gói quá cũ (trước nextExpectedSequence quá nhiều), bỏ qua
-            if (seq < nextExpectedSequence && (nextExpectedSequence - seq) > 100) {
-                return;
+            packets.put(sequence, packet);
+            payloadSize = Math.max(payloadSize, packet.getPayloadLength());
+            while (packets.size() > capacity) {
+                removeFarthestPacket();
             }
-
-            // Thêm vào buffer
-            buffer.put(seq, packet);
-
-            // Giới hạn kích thước buffer
-            while (buffer.size() > maxPackets) {
-                buffer.pollFirstEntry();
-            }
+            packetAvailable.signalAll();
         } finally {
             lock.unlock();
         }
     }
 
     /**
-     * Lấy gói tiếp theo để phát (theo thứ tự sequence)
-     * @return Gói RTP tiếp theo, hoặc null nếu buffer trống
+     * Waits for the startup buffer and returns packets in order. The audio device clocks playout.
      */
     public RTPPacket getNextPacket() {
         lock.lock();
         try {
-            // Nếu buffer trống, trả về null
-            if (buffer.isEmpty()) {
-                return null;
-            }
-
-            // Kiểm tra gói tiếp theo có trong buffer không
-            RTPPacket packet = buffer.get(nextExpectedSequence);
-
-            if (packet != null) {
-                // Có gói mong muốn, lấy ra và cập nhật nextExpectedSequence
-                buffer.remove(nextExpectedSequence);
-                nextExpectedSequence = (nextExpectedSequence + 1) & 0xFFFF;
-                return packet;
-            } else {
-                // Không có gói mong muốn, kiểm tra có gói nào khác không
-                Map.Entry<Integer, RTPPacket> firstEntry = buffer.firstEntry();
-
-                if (firstEntry != null) {
-                    int firstSeq = firstEntry.getKey();
-
-                    // Nếu gói đầu tiên lệch quá xa so với mong muốn, skip
-                    if ((firstSeq - nextExpectedSequence) > 10) {
-                        // Skip gap, cập nhật nextExpectedSequence
-                        nextExpectedSequence = firstSeq;
-                        buffer.remove(firstSeq);
-                        nextExpectedSequence = (nextExpectedSequence + 1) & 0xFFFF;
-                        return firstEntry.getValue();
-                    }
-
-                    // Chờ thêm (gap nhỏ)
-                    return null;
+            while (!Thread.currentThread().isInterrupted()) {
+                if (nextSequence < 0 || (!started && packets.size() < capacity)) {
+                    packetAvailable.await();
+                    continue;
                 }
-            }
+                if (!started) {
+                    started = true;
+                }
 
+                RTPPacket packet = packets.remove(nextSequence);
+                if (packet != null) {
+                    return acceptPacket(packet);
+                }
+
+                int closestSequence = findClosestFutureSequence();
+                if (closestSequence >= 0) {
+                    long remaining = REORDER_GRACE_NANOS;
+                    while (packets.get(nextSequence) == null && remaining > 0) {
+                        remaining = packetAvailable.awaitNanos(remaining);
+                    }
+                    packet = packets.remove(nextSequence);
+                    if (packet != null) {
+                        return acceptPacket(packet);
+                    }
+                }
+
+                int playedSequence = nextSequence;
+                nextSequence = (nextSequence + 1) & 0xFFFF;
+                closestSequence = findClosestFutureSequence();
+                if (closestSequence >= 0
+                        && sequenceDifference(closestSequence, playedSequence) > capacity * 2) {
+                    packet = packets.remove(closestSequence);
+                    nextSequence = (closestSequence + 1) & 0xFFFF;
+                    return acceptPacket(packet);
+                }
+                byte[] concealment = concealLastFrame();
+                return new RTPPacket(RTPPacket.TYPE_LIVE, playedSequence, 0,
+                        concealment, concealment.length);
+            }
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return null;
         } finally {
             lock.unlock();
         }
     }
 
-    /**
-     * Đặt lại buffer (xóa tất cả gói, reset sequence)
-     */
     public void clear() {
         lock.lock();
         try {
-            buffer.clear();
-            nextExpectedSequence = 0;
+            packets.clear();
+            nextSequence = -1;
+            started = false;
+            payloadSize = 0;
+            lastPayload = null;
+            consecutiveLosses = 0;
+            packetAvailable.signalAll();
         } finally {
             lock.unlock();
         }
     }
 
-    /**
-     * Cập nhật kích thước buffer
-     * @param bufferSizeMs Thời gian buffer mới (ms)
-     */
     public void setBufferSizeMs(int bufferSizeMs) {
+        if (bufferSizeMs < AudioConstants.FRAME_MS
+                || bufferSizeMs > 500) {
+            throw new IllegalArgumentException("Jitter buffer phải từ 20 ms đến 500 ms.");
+        }
         lock.lock();
         try {
             this.bufferSizeMs = bufferSizeMs;
-            this.maxPackets = bufferSizeMs / AudioConstants.FRAME_MS;
+            capacity = Math.max(1, (bufferSizeMs + AudioConstants.FRAME_MS - 1)
+                    / AudioConstants.FRAME_MS);
+            while (packets.size() > capacity) {
+                removeFarthestPacket();
+            }
+            packetAvailable.signalAll();
         } finally {
             lock.unlock();
         }
     }
 
-    /**
-     * Lấy kích thước buffer hiện tại (ms)
-     */
     public int getBufferSizeMs() {
         return bufferSizeMs;
     }
 
-    /**
-     * Lấy số gói đang có trong buffer
-     */
     public int size() {
         lock.lock();
         try {
-            return buffer.size();
+            return packets.size();
         } finally {
             lock.unlock();
         }
     }
 
-    /**
-     * Kiểm tra buffer có trống không
-     */
     public boolean isEmpty() {
-        lock.lock();
-        try {
-            return buffer.isEmpty();
-        } finally {
-            lock.unlock();
+        return size() == 0;
+    }
+
+    private RTPPacket acceptPacket(RTPPacket packet) {
+        nextSequence = (packet.getSequence() + 1) & 0xFFFF;
+        lastPayload = packet.getPayload().clone();
+        consecutiveLosses = 0;
+        return packet;
+    }
+
+    private int findClosestFutureSequence() {
+        int closest = -1;
+        int closestDistance = Integer.MAX_VALUE;
+        for (int sequence : packets.keySet()) {
+            int distance = sequenceDifference(sequence, nextSequence);
+            if (distance > 0 && distance < closestDistance) {
+                closest = sequence;
+                closestDistance = distance;
+            }
         }
+        return closest;
+    }
+
+    private byte[] concealLastFrame() {
+        consecutiveLosses++;
+        if (lastPayload == null || lastPayload.length != payloadSize || consecutiveLosses > 4) {
+            return new byte[payloadSize];
+        }
+        byte[] faded = Arrays.copyOf(lastPayload, lastPayload.length);
+        double gain = Math.pow(0.65, consecutiveLosses);
+        for (int i = 0; i + 1 < faded.length; i += 2) {
+            short sample = (short) (((faded[i] & 0xFF) << 8) | (faded[i + 1] & 0xFF));
+            int attenuated = (int) (sample * gain);
+            faded[i] = (byte) (attenuated >>> 8);
+            faded[i + 1] = (byte) attenuated;
+        }
+        return faded;
+    }
+
+    private void removeFarthestPacket() {
+        int farthestSequence = -1;
+        int farthestDistance = -1;
+        for (int sequence : packets.keySet()) {
+            int distance = sequenceDifference(sequence, nextSequence);
+            if (distance > farthestDistance) {
+                farthestSequence = sequence;
+                farthestDistance = distance;
+            }
+        }
+        if (farthestSequence >= 0) {
+            packets.remove(farthestSequence);
+        }
+    }
+
+    private static int sequenceDifference(int sequence, int reference) {
+        return (short) ((sequence - reference) & 0xFFFF);
     }
 }

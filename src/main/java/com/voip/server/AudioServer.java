@@ -1,201 +1,225 @@
 package com.voip.server;
 
 import com.voip.protocol.AudioConstants;
+import com.voip.protocol.AudioCrypto;
 import com.voip.protocol.ControlMessage;
+import com.voip.protocol.G711Codec;
 import com.voip.protocol.RTPPacket;
 
 import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class AudioServer implements AudioCapture.AudioDataListener {
-    private DatagramSocket serverSocket;
-    private int port;
-    private volatile boolean running = false;
-    private AudioCapture audioCapture;
-
+    private static final Logger LOGGER = Logger.getLogger(AudioServer.class.getName());
+    private final int port;
+    private final AudioCapture audioCapture;
     private final Set<InetSocketAddress> clients = ConcurrentHashMap.newKeySet();
-    private final StreamHistoryBuffer history = new StreamHistoryBuffer();
-    private final ConcurrentHashMap<InetSocketAddress, AtomicInteger> replayEpoch = new ConcurrentHashMap<>();
-
+    private final ConcurrentHashMap<InetSocketAddress, Long> lastClientActivity =
+            new ConcurrentHashMap<>();
     private final AtomicInteger sequence = new AtomicInteger();
-    private final AtomicInteger packetsSent = new AtomicInteger();
+    private final AtomicLong packetsSent = new AtomicLong();
     private final AtomicLong bytesSent = new AtomicLong();
-    private long startTimeMs;
+    private final String codec;
+    private final String encryptionKey;
+    private volatile DatagramSocket serverSocket;
+    private volatile boolean running;
+    private volatile Thread listenerThread;
 
     public AudioServer(int port) {
-        this.port = port;
-        this.audioCapture = new AudioCapture(this);
+        this(port, null);
     }
 
-    public void startServer() {
-        try {
-            serverSocket = new DatagramSocket(port);
-            running = true;
-            startTimeMs = System.currentTimeMillis();
-            sequence.set(0);
-            packetsSent.set(0);
-            bytesSent.set(0);
-            history.clear();
-
-            audioCapture.startCapture();
-
-            Thread clientListenerThread = new Thread(this::listenForClientRequests, "Server-Listener-Thread");
-            clientListenerThread.start();
-
-            System.out.println("AudioServer đã khởi động thành công trên cổng UDP: " + port);
-        } catch (SocketException | LineUnavailableException e) {
-            e.printStackTrace();
+    public AudioServer(int port, Path wavFile) {
+        if (port < 1 || port > 65535) {
+            throw new IllegalArgumentException("Cổng UDP phải từ 1 đến 65535.");
         }
+        this.port = port;
+        codec = System.getProperty(AudioConstants.CODEC_PROPERTY, "pcm").trim().toLowerCase();
+        if (!codec.equals("pcm") && !codec.equals("ulaw")) {
+            throw new IllegalArgumentException("Codec không hỗ trợ: " + codec);
+        }
+        encryptionKey = System.getProperty(AudioConstants.ENCRYPTION_KEY_PROPERTY, "");
+        audioCapture = new AudioCapture(this);
+        this.wavFile = wavFile;
+    }
+
+    private final Path wavFile;
+
+    public synchronized void startServer()
+            throws IOException, LineUnavailableException, UnsupportedAudioFileException {
+        if (running) {
+            return;
+        }
+        DatagramSocket socket = new DatagramSocket(port);
+        socket.setSoTimeout(5000);
+        serverSocket = socket;
+        sequence.set(0);
+        packetsSent.set(0);
+        bytesSent.set(0);
+        running = true;
+        try {
+            if (wavFile == null) {
+                audioCapture.startCapture();
+            } else {
+                audioCapture.startCapture(wavFile);
+            }
+        } catch (IOException | LineUnavailableException | UnsupportedAudioFileException
+                 | RuntimeException e) {
+            running = false;
+            serverSocket = null;
+            audioCapture.stopCapture();
+            socket.close();
+            throw e;
+        }
+        listenerThread = new Thread(this::listenForClientRequests, "Server-UDP-Listener");
+        listenerThread.setDaemon(true);
+        listenerThread.start();
+        LOGGER.info("Audio server đang chạy trên UDP/" + port + " (" + codec + ").");
     }
 
     private void listenForClientRequests() {
-        byte[] buffer = new byte[2048];
+        byte[] buffer = new byte[AudioConstants.MAX_UDP_PACKET_SIZE];
         while (running) {
             try {
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                serverSocket.receive(packet);
-
-                InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
-                byte[] copy = java.util.Arrays.copyOf(packet.getData(), packet.getLength());
-                RTPPacket rtp = RTPPacket.decode(copy, copy.length);
-
-                if (rtp != null && rtp.getType() == RTPPacket.TYPE_CONTROL) {
-                    handleControl(clientAddress, ControlMessage.fromRtp(rtp));
-                } else {
-                    // Gói lạ / ping: vẫn đăng ký để demo khi Client chưa gửi JOIN
-                    registerClient(clientAddress);
+                DatagramPacket datagram = new DatagramPacket(buffer, buffer.length);
+                serverSocket.receive(datagram);
+                InetSocketAddress client = new InetSocketAddress(
+                        datagram.getAddress(), datagram.getPort());
+                RTPPacket rtp = RTPPacket.decode(
+                        Arrays.copyOf(datagram.getData(), datagram.getLength()), datagram.getLength());
+                if (rtp == null || rtp.getType() != RTPPacket.TYPE_CONTROL) {
+                    continue;
                 }
+                lastClientActivity.put(client, System.currentTimeMillis());
+                handleControl(client, ControlMessage.fromRtp(rtp));
+            } catch (SocketTimeoutException e) {
+                removeInactiveClients();
+            } catch (SocketException e) {
+                if (running) {
+                    LOGGER.log(Level.SEVERE, "Socket server gặp lỗi.", e);
+                }
+                break;
             } catch (IOException e) {
-                if (!running) {
-                    break;
+                if (running) {
+                    LOGGER.log(Level.SEVERE, "Lỗi nhận lệnh điều khiển UDP.", e);
                 }
-                e.printStackTrace();
             }
         }
     }
 
-    private void handleControl(InetSocketAddress clientAddress, ControlMessage control) {
+    private void handleControl(InetSocketAddress client, ControlMessage control) {
         if (control == null) {
-            registerClient(clientAddress);
             return;
         }
         switch (control.getCommand()) {
-            case ControlMessage.JOIN -> registerClient(clientAddress);
+            case ControlMessage.JOIN -> {
+                registerClient(client);
+                sendControlResponse(client, ControlMessage.pong());
+            }
+            case ControlMessage.PING -> {
+                registerClient(client);
+                sendControlResponse(client, ControlMessage.pong());
+            }
             case ControlMessage.LEAVE -> {
-                cancelReplay(clientAddress);
-                clients.remove(clientAddress);
-                replayEpoch.remove(clientAddress);
-                System.out.println("Client rời: " + clientAddress);
+                clients.remove(client);
+                lastClientActivity.remove(client);
+                LOGGER.info("Client rời: " + client);
             }
-            case ControlMessage.SEEK -> {
-                registerClient(clientAddress);
-                startHistoryReplay(clientAddress, control.getSequence());
-            }
-            case ControlMessage.GO_LIVE -> {
-                registerClient(clientAddress);
-                cancelReplay(clientAddress);
-                System.out.println("Client về live: " + clientAddress);
-            }
-            default -> registerClient(clientAddress);
+            default -> LOGGER.warning("Bỏ qua lệnh điều khiển không hỗ trợ.");
         }
     }
 
-    private void registerClient(InetSocketAddress clientAddress) {
-        if (clients.add(clientAddress)) {
-            System.out.println("Đã kết nối với Client mới: " + clientAddress);
+    private void registerClient(InetSocketAddress client) {
+        lastClientActivity.put(client, System.currentTimeMillis());
+        if (clients.add(client)) {
+            LOGGER.info("Client tham gia: " + client);
+        }
+    }
+
+    private void removeInactiveClients() {
+        long inactiveBefore = System.currentTimeMillis() - 15_000;
+        for (var entry : lastClientActivity.entrySet()) {
+            if (entry.getValue() < inactiveBefore
+                    && lastClientActivity.remove(entry.getKey(), entry.getValue())) {
+                    clients.remove(entry.getKey());
+                    LOGGER.info("Đã loại client mất heartbeat: " + entry.getKey());
+            }
         }
     }
 
     @Override
     public void onAudioDataCaptured(byte[] data, int length) {
-        if (!running) {
+        if (!running || data == null || length <= 0 || length > data.length) {
             return;
         }
-
         int seq = sequence.getAndIncrement() & 0xFFFF;
-        int timestampMs = (int) (System.currentTimeMillis() - startTimeMs);
-        RTPPacket rtp = new RTPPacket(RTPPacket.TYPE_LIVE, seq, timestampMs, data, length);
-        history.add(rtp);
-
-        if (clients.isEmpty()) {
-            return;
-        }
-        byte[] wire = rtp.encode();
-        for (InetSocketAddress clientAddress : clients) {
-            sendBytes(clientAddress, wire);
-        }
-    }
-
-    private void startHistoryReplay(InetSocketAddress client, int fromSeq) {
-        int epoch = replayEpoch.computeIfAbsent(client, key -> new AtomicInteger()).incrementAndGet();
-        List<RTPPacket> packets = history.getFrom(fromSeq);
-        System.out.println("SEEK " + client + " từ seq=" + (fromSeq & 0xFFFF)
-                + " (" + packets.size() + " gói lịch sử)");
-
-        Thread replayThread = new Thread(() -> {
-            for (RTPPacket packet : packets) {
-                if (!running) {
-                    return;
-                }
-                AtomicInteger current = replayEpoch.get(client);
-                if (current == null || current.get() != epoch) {
-                    return;
-                }
-                sendBytes(client, packet.encode());
-                try {
-                    Thread.sleep(AudioConstants.FRAME_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+        int timestamp = (int) System.currentTimeMillis();
+        try {
+            byte[] payload = Arrays.copyOf(data, length);
+            if (codec.equals("ulaw")) {
+                payload = G711Codec.encode(payload);
             }
-        }, "History-Replay-" + client.getAddress().getHostAddress());
-        replayThread.setDaemon(true);
-        replayThread.start();
+            payload = AudioCrypto.transform(payload, encryptionKey, seq, timestamp);
+            RTPPacket rtp = new RTPPacket(RTPPacket.TYPE_LIVE, seq, timestamp,
+                    payload, payload.length);
+            byte[] wire = rtp.encode();
+            for (InetSocketAddress client : clients) {
+                sendBytes(client, wire);
+            }
+        } catch (GeneralSecurityException e) {
+            LOGGER.log(Level.SEVERE, "Không thể mã hóa gói âm thanh.", e);
+        }
     }
 
-    private void cancelReplay(InetSocketAddress client) {
-        replayEpoch.computeIfAbsent(client, key -> new AtomicInteger()).incrementAndGet();
+    private void sendControlResponse(InetSocketAddress client, ControlMessage control) {
+        byte[] wire = control.toRtpPacket().encode();
+        sendBytes(client, wire);
     }
 
-    private void sendBytes(InetSocketAddress clientAddress, byte[] wire) {
-        if (serverSocket == null || serverSocket.isClosed()) {
+    private void sendBytes(InetSocketAddress client, byte[] wire) {
+        DatagramSocket socket = serverSocket;
+        if (socket == null || socket.isClosed()) {
             return;
         }
         try {
-            DatagramPacket packet = new DatagramPacket(
-                    wire, wire.length, clientAddress.getAddress(), clientAddress.getPort());
-            serverSocket.send(packet);
+            socket.send(new DatagramPacket(wire, wire.length,
+                    client.getAddress(), client.getPort()));
             packetsSent.incrementAndGet();
             bytesSent.addAndGet(wire.length);
         } catch (IOException e) {
-            // Client có thể đã tắt — lần LEAVE / timeout sẽ gỡ khỏi danh sách
+            if (running) {
+                LOGGER.log(Level.WARNING, "Gửi UDP thất bại tới " + client, e);
+            }
         }
     }
 
-    public void stopServer() {
+    public synchronized void stopServer() {
         running = false;
-        for (InetSocketAddress client : clients) {
-            cancelReplay(client);
-        }
         audioCapture.stopCapture();
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            serverSocket.close();
+        DatagramSocket socket = serverSocket;
+        serverSocket = null;
+        if (socket != null) {
+            socket.close();
         }
         clients.clear();
-        replayEpoch.clear();
-        history.clear();
-        System.out.println("AudioServer đã dừng.");
+        lastClientActivity.clear();
+        LOGGER.info("Audio server đã dừng.");
     }
 
     public boolean isRunning() {
@@ -214,7 +238,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         return clients.size();
     }
 
-    public int getPacketsSent() {
+    public long getPacketsSent() {
         return packetsSent.get();
     }
 
@@ -222,7 +246,8 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         return bytesSent.get();
     }
 
-    public StreamHistoryBuffer getHistory() {
-        return history;
+    public String getCodec() {
+        return codec;
     }
+
 }

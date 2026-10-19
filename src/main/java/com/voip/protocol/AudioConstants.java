@@ -14,6 +14,8 @@ public final class AudioConstants {
 
     /** Mỗi gói chứa 20 ms PCM. */
     public static final int FRAME_MS = 20;
+    public static final int JITTER_BUFFER_MS = 100;
+    public static final int MAX_UDP_PACKET_SIZE = 1200;
 
     /** 16000 Hz * 2 byte * 1 kênh * 0.02 s = 640 byte. */
     public static final int PCM_FRAME_BYTES =
@@ -21,11 +23,10 @@ public final class AudioConstants {
 
     public static final int DEFAULT_UDP_PORT = 8888;
 
-    /** Cửa sổ tua lại (DVR) phía Server. */
-    public static final int HISTORY_MS = 30_000;
-
-    public static final int HISTORY_PACKET_COUNT = HISTORY_MS / FRAME_MS;
+    /** Read consistently on both ends: -Dvoip.codec=ulaw and -Dvoip.key=<shared secret>. */
+    public static final String CODEC_PROPERTY = "voip.codec";
+    public static final String ENCRYPTION_KEY_PROPERTY = "voip.key";
 
     private AudioConstants() {
-    }
+    }s
 }
