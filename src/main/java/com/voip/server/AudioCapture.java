@@ -58,7 +58,7 @@ public class AudioCapture implements Runnable {
                 ? AudioSystem.isLineSupported(info)
                 : mixer.isLineSupported(info);
         if (!supported) {
-            throw new LineUnavailableException("Microphone không hỗ trợ định dạng 16 kHz PCM mono.");
+            throw new LineUnavailableException("Microphone khong ho tro dinh dang 16 kHz PCM mono.");
         }
         TargetDataLine line = (TargetDataLine) (mixer == null
                 ? AudioSystem.getLine(info) : mixer.getLine(info));
@@ -83,7 +83,7 @@ public class AudioCapture implements Runnable {
         try {
             if (!AudioSystem.isConversionSupported(audioFormat, source.getFormat())) {
                 throw new UnsupportedAudioFileException(
-                        "Không thể chuyển WAV sang PCM 16 kHz mono: " + source.getFormat());
+                        "Khong the chuyen WAV sang PCM 16 kHz mono: " + source.getFormat());
             }
             audioInputStream = AudioSystem.getAudioInputStream(audioFormat, source);
             startThread();
@@ -100,12 +100,13 @@ public class AudioCapture implements Runnable {
 
     private void ensureStopped() {
         if (running || (captureThread != null && captureThread.isAlive())) {
-            throw new IllegalStateException("Nguồn âm thanh đang chạy.");
+            throw new IllegalStateException("Nguon am thanh dang chay.");
         }
         captureThread = null;
     }
 
     private void startThread() {
+        // Moi lan capture co ma rieng de luong cu khong anh huong phien moi khi dung/khoi dong lai.
         long generation = ++captureGeneration;
         running = true;
         TargetDataLine line = targetDataLine;
@@ -117,6 +118,7 @@ public class AudioCapture implements Runnable {
     }
 
     public synchronized void stopCapture() {
+        // Vo hieu hoa generation truoc khi dong nguon de luong dang doc khong gui them frame.
         ++captureGeneration;
         running = false;
         if (targetDataLine != null) {
@@ -129,7 +131,7 @@ public class AudioCapture implements Runnable {
             try {
                 audioInputStream.close();
             } catch (IOException e) {
-                LOGGER.log(Level.WARNING, "Không thể đóng file âm thanh.", e);
+                LOGGER.log(Level.WARNING, "Khong the dong file am thanh.", e);
             }
             audioInputStream = null;
         }
@@ -141,14 +143,14 @@ public class AudioCapture implements Runnable {
                     thread.join(3000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Bị ngắt khi chờ luồng thu âm dừng.", e);
+                    throw new IllegalStateException("Bi ngat khi cho luong thu am dung.", e);
                 }
             }
             if (!thread.isAlive()) {
                 captureThread = null;
             } else {
                 throw new IllegalStateException(
-                        "Luồng thu âm cũ chưa dừng sau khi đóng microphone; không thể mở thiết bị mới an toàn.");
+                        "Luong thu am cu chua dung sau khi dong microphone; khong the mo thiet bi moi an toan.");
             }
         }
     }
@@ -177,6 +179,7 @@ public class AudioCapture implements Runnable {
     }
 
     private void capture(long generation, TargetDataLine line, AudioInputStream stream) {
+        // Chi gui frame hoan chinh; moi frame tuong ung 20 ms am thanh o cau hinh hien tai.
         byte[] frame = new byte[AudioConstants.PCM_FRAME_BYTES];
         long nextFrameTime = System.nanoTime();
         boolean reachedEndOfInput = false;
@@ -192,6 +195,7 @@ public class AudioCapture implements Runnable {
                         && isCaptureActive(generation)) {
                     listener.onAudioDataCaptured(Arrays.copyOf(frame, bytesRead), bytesRead);
                 }
+                // WAV khong co clock thiet bi, nen tu canh nhip doc theo thoi luong frame.
                 nextFrameTime += AudioConstants.FRAME_MS * 1_000_000L;
                 long remaining = nextFrameTime - System.nanoTime();
                 if (remaining > 0 && line == null && isCaptureActive(generation)) {
@@ -202,17 +206,17 @@ public class AudioCapture implements Runnable {
             }
         } catch (IOException e) {
             if (isCaptureActive(generation)) {
-                LOGGER.log(Level.SEVERE, "Lỗi đọc nguồn âm thanh.", e);
+                LOGGER.log(Level.SEVERE, "Loi doc nguon am thanh.", e);
                 if (listener != null) {
                     listener.onAudioCaptureFailed(e);
                 }
             }
         } catch (RuntimeException e) {
             if (isCaptureActive(generation)) {
-                LOGGER.log(Level.SEVERE, "Lỗi driver khi đọc nguồn âm thanh.", e);
+                LOGGER.log(Level.SEVERE, "Loi driver khi doc nguon am thanh.", e);
                 if (listener != null) {
                     listener.onAudioCaptureFailed(
-                            new IOException("Lỗi driver âm thanh: " + e.getMessage(), e));
+                            new IOException("Loi driver am thanh: " + e.getMessage(), e));
                 }
             }
         } finally {
@@ -249,7 +253,7 @@ public class AudioCapture implements Runnable {
         while (isCaptureActive(generation) && offset < frame.length) {
             int count = line.read(frame, offset, frame.length - offset);
             if (count < 0) {
-                throw new IOException("Microphone đã ngừng cung cấp dữ liệu.");
+                throw new IOException("Microphone da ngung cung cap du lieu.");
             }
             if (count == 0) {
                 if (!isCaptureActive(generation)) {
@@ -259,7 +263,7 @@ public class AudioCapture implements Runnable {
                     noDataSince = System.nanoTime();
                 } else if (System.nanoTime() - noDataSince >= 2_000_000_000L) {
                     throw new IOException(
-                            "Microphone không cung cấp dữ liệu trong 2 giây.");
+                            "Microphone khong cung cap du lieu trong 2 giay.");
                 }
                 LockSupport.parkNanos(1_000_000L);
                 continue;

@@ -59,8 +59,9 @@ public final class ControlMessage {
     public byte[] encode() {
         byte[] text = message.getBytes(StandardCharsets.UTF_8);
         if (text.length > MAX_MESSAGE_BYTES) {
-            throw new IllegalArgumentException("Thông báo điều khiển quá dài.");
+            throw new IllegalArgumentException("Thong bao dieu khien qua dai.");
         }
+        // Cac truong co do dai co dinh dung truoc phan thong diep UTF-8 tuy chon.
         ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + text.length).order(ByteOrder.BIG_ENDIAN);
         buffer.put(MAGIC);
         buffer.put(VERSION);
@@ -75,6 +76,7 @@ public final class ControlMessage {
     }
 
     public static ControlMessage decode(byte[] data, int length) {
+        // Kiem tra kich thuoc truoc khi doc truong de loai datagram sai dinh dang.
         if (data == null || length < HEADER_SIZE || length > data.length
                 || length > HEADER_SIZE + MAX_MESSAGE_BYTES) {
             return null;
@@ -85,6 +87,7 @@ public final class ControlMessage {
                 return null;
             }
         }
+        // Kiem tra magic/version giup phan biet thong diep dieu khien voi goi media.
         if (buffer.get() != VERSION) {
             return null;
         }

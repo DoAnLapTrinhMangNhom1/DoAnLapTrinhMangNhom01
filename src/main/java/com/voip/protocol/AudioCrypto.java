@@ -26,6 +26,7 @@ public final class AudioCrypto {
             key = null;
             return;
         }
+        // Hai dau dung cung salt/thuat toan de dan xuat cung AES key tu passphrase.
         char[] password = passphrase.toCharArray();
         PBEKeySpec spec = new PBEKeySpec(password, SALT, ITERATIONS, 256);
         try {
@@ -47,6 +48,7 @@ public final class AudioCrypto {
         if (key == null) {
             return plaintext.clone();
         }
+        // Nonce ngau nhien phai duy nhat theo khoa; nonce duoc gui kem ciphertext.
         byte[] nonce = new byte[NONCE_BYTES];
         RANDOM.nextBytes(nonce);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -63,8 +65,9 @@ public final class AudioCrypto {
         if (key == null) {
             return encrypted.clone();
         }
+        // GCM nem AEADBadTagException neu khoa, payload hoac header xac thuc khong khop.
         if (encrypted.length < NONCE_BYTES + TAG_BITS / 8) {
-            throw new AEADBadTagException("Gói mã hóa quá ngắn.");
+            throw new AEADBadTagException("Goi ma hoa qua ngan.");
         }
         byte[] nonce = Arrays.copyOf(encrypted, NONCE_BYTES);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");

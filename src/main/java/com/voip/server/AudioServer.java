@@ -68,14 +68,14 @@ public class AudioServer implements AudioCapture.AudioDataListener {
 
     public AudioServer(int port, Path wavFile, Mixer.Info inputDevice) {
         if (port < 1 || port > 65535) {
-            throw new IllegalArgumentException("Cổng UDP phải từ 1 đến 65535.");
+            throw new IllegalArgumentException("Cong UDP phai tu 1 den 65535.");
         }
         this.port = port;
         this.wavFile = wavFile;
         this.inputDevice = inputDevice;
         codec = System.getProperty(AudioConstants.CODEC_PROPERTY, "pcm").trim().toLowerCase();
         if (!codec.equals("pcm") && !codec.equals("ulaw")) {
-            throw new IllegalArgumentException("Codec không hỗ trợ: " + codec);
+            throw new IllegalArgumentException("Codec khong ho tro: " + codec);
         }
         payloadType = codec.equals("ulaw")
                 ? RTPPacket.PAYLOAD_TYPE_ULAW : RTPPacket.PAYLOAD_TYPE_PCM;
@@ -83,7 +83,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         try {
             audioCrypto = new AudioCrypto(encryptionKey);
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Không thể khởi tạo bảo vệ âm thanh.", e);
+            throw new IllegalStateException("Khong the khoi tao bao ve am thanh.", e);
         }
         audioCapture = new AudioCapture(this);
     }
@@ -123,10 +123,11 @@ public class AudioServer implements AudioCapture.AudioDataListener {
                 () -> listenForClientRequests(socket), "Server-UDP-Listener");
         listenerThread.setDaemon(true);
         listenerThread.start();
-        LOGGER.info("Audio server đang chạy trên UDP/" + port + " (" + codec + ").");
+        LOGGER.info("Audio server dang chay tren UDP/" + port + " (" + codec + ").");
     }
 
     private void listenForClientRequests(DatagramSocket listenerSocket) {
+        // Socket timeout cho phep dinh ky loai client khong con gui heartbeat.
         byte[] buffer = new byte[AudioConstants.MAX_UDP_PACKET_SIZE];
         while (running && serverSocket == listenerSocket) {
             try {
@@ -145,12 +146,12 @@ public class AudioServer implements AudioCapture.AudioDataListener {
                 }
             } catch (SocketException e) {
                 if (running && serverSocket == listenerSocket) {
-                    LOGGER.log(Level.SEVERE, "Socket server gặp lỗi.", e);
+                    LOGGER.log(Level.SEVERE, "Socket server gap loi.", e);
                 }
                 break;
             } catch (IOException e) {
                 if (running) {
-                    LOGGER.log(Level.SEVERE, "Lỗi nhận lệnh điều khiển UDP.", e);
+                    LOGGER.log(Level.SEVERE, "Loi nhan lenh dieu khien UDP.", e);
                 }
             }
         }
@@ -159,10 +160,11 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     private void handleControl(InetSocketAddress client, ControlMessage control) {
         switch (control.getCommand()) {
             case ControlMessage.JOIN -> {
+                // Chi nhan client dung cung payload type va cung che do ma hoa voi server.
                 if (control.getPayloadType() != payloadType
                         || control.isEncrypted() != audioCrypto.isEnabled()) {
                     sendControlResponse(client, ControlMessage.reject(
-                            "Codec hoặc chế độ mã hóa không khớp với server."));
+                            "Codec hoac che do ma hoa khong khop voi server."));
                     return;
                 }
                 registerClient(client);
@@ -177,9 +179,9 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             case ControlMessage.LEAVE -> {
                 clients.remove(client);
                 lastClientActivity.remove(client);
-                LOGGER.info("Client rời: " + client);
+                LOGGER.info("Client roi: " + client);
             }
-            default -> LOGGER.fine("Bỏ qua phản hồi điều khiển từ client.");
+            default -> LOGGER.fine("Bo qua phan hoi dieu khien tu client.");
         }
     }
 
@@ -196,7 +198,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             if (entry.getValue() < inactiveBefore
                     && lastClientActivity.remove(entry.getKey(), entry.getValue())) {
                 clients.remove(entry.getKey());
-                LOGGER.info("Đã loại client mất heartbeat: " + entry.getKey());
+                LOGGER.info("Da loai client mat heartbeat: " + entry.getKey());
             }
         }
     }
@@ -209,6 +211,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         audioFramesCaptured.incrementAndGet();
         inputLevelPercent.set(AudioLevel.rmsPercent(data, length));
         lastAudioFrameNanos = System.nanoTime();
+        // Sequence tang tung goi; timestamp tang theo so mau trong mot frame am thanh.
         int seq = sequence.getAndIncrement() & 0xFFFF;
         int ts = timestamp.getAndAdd(SAMPLES_PER_FRAME);
         try {
@@ -217,13 +220,15 @@ public class AudioServer implements AudioCapture.AudioDataListener {
                 payload = G711Codec.encode(payload);
             }
             RTPPacket header = new RTPPacket(payloadType, seq, ts, ssrc, new byte[0]);
+            // Header duoc giu nguyen trong goi, nhung duoc xac thuc cung payload boi AES-GCM.
             payload = audioCrypto.encrypt(payload, header.getHeaderBytes());
             byte[] wire = new RTPPacket(payloadType, seq, ts, ssrc, payload).encode();
+            // Gui unicast rieng cho tung client da JOIN; khong phai IP multicast.
             for (InetSocketAddress client : clients) {
                 sendBytes(client, wire);
             }
         } catch (GeneralSecurityException e) {
-            LOGGER.log(Level.SEVERE, "Không thể bảo vệ gói âm thanh.", e);
+            LOGGER.log(Level.SEVERE, "Khong the bao ve goi am thanh.", e);
         }
     }
 
@@ -235,7 +240,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     @Override
     public void onAudioSourceEnded() {
         audioSourceEnded = true;
-        LOGGER.info("Đã phát hết tệp WAV.");
+        LOGGER.info("Da phat het tep WAV.");
     }
 
     private void sendControlResponse(InetSocketAddress client, ControlMessage control) {
@@ -254,7 +259,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             bytesSent.addAndGet(wire.length);
         } catch (IOException e) {
             if (running) {
-                LOGGER.log(Level.WARNING, "Gửi UDP thất bại tới " + client, e);
+                LOGGER.log(Level.WARNING, "Gui UDP that bai toi " + client, e);
             }
         }
     }
@@ -264,7 +269,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         try {
             audioCapture.stopCapture();
         } catch (IllegalStateException e) {
-            LOGGER.log(Level.SEVERE, "Không thể dừng hoàn toàn luồng thu âm.", e);
+            LOGGER.log(Level.SEVERE, "Khong the dung hoan toan luong thu am.", e);
         } finally {
             DatagramSocket socket = serverSocket;
             serverSocket = null;
@@ -273,7 +278,7 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             }
             clients.clear();
             lastClientActivity.clear();
-            LOGGER.info("Audio server đã dừng.");
+            LOGGER.info("Audio server da dung.");
         }
     }
 

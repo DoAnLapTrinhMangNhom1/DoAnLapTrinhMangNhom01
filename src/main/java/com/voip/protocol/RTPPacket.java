@@ -21,7 +21,7 @@ public final class RTPPacket {
 
     public RTPPacket(int payloadType, int sequence, int timestamp, long ssrc, byte[] payload) {
         if (payloadType < 0 || payloadType > 127 || payload == null) {
-            throw new IllegalArgumentException("Thông tin RTP không hợp lệ.");
+            throw new IllegalArgumentException("Thong tin RTP khong hop le.");
         }
         this.payloadType = payloadType;
         this.sequence = sequence & 0xFFFF;
@@ -58,6 +58,7 @@ public final class RTPPacket {
 
     private static byte[] createHeader(int payloadType, int sequence, int timestamp, long ssrc) {
         ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
+        // RTP co dinh 12 byte: version/payload type, sequence, timestamp va SSRC.
         header.put((byte) (VERSION << 6));
         header.put((byte) payloadType);
         header.putShort((short) sequence);
@@ -85,6 +86,7 @@ public final class RTPPacket {
         long ssrc = Integer.toUnsignedLong(buffer.getInt());
         int headerLength = HEADER_SIZE + csrcCount * Integer.BYTES;
         if (hasExtension) {
+            // RTP extension co do dai tinh theo so tu 32-bit, sau header extension 4 byte.
             if (length < headerLength + 4) {
                 return null;
             }
@@ -98,6 +100,7 @@ public final class RTPPacket {
         }
         int payloadEnd = length;
         if (hasPadding) {
+            // Byte cuoi cung cho biet so byte padding can loai khoi payload.
             int paddingLength = Byte.toUnsignedInt(raw[length - 1]);
             if (paddingLength == 0 || paddingLength > length - headerLength) {
                 return null;
