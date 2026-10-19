@@ -22,20 +22,23 @@ public class HomeForm extends javax.swing.JFrame {
         txtServerPort.setText(Integer.toString(AudioConstants.DEFAULT_UDP_PORT));
     }
     private boolean validateConnectionSettings() {
-    String ip = txtServerIP.getText().trim();
-    String serverPortText = txtServerPort.getText().trim();
-
-    if (ip.isEmpty()) {
-        javax.swing.JOptionPane.showMessageDialog(
-                this, "Vui lòng nhập IP Server.");
+    if (!validateServerPort()) {
+        return false;
+    }
+    if (txtServerIP.getText().trim().isEmpty()) {
+        javax.swing.JOptionPane.showMessageDialog(this, "Vui lòng nhập IP Server.");
         txtServerIP.requestFocus();
         return false;
     }
+    return true;
+}
 
+    private boolean validateServerPort() {
+    String serverPortText = txtServerPort.getText().trim();
     try {
         int serverPort = Integer.parseInt(serverPortText);
 
-        if (serverPort < 1 || serverPort > 65535 ) {
+        if (serverPort < 1 || serverPort > 65535) {
             javax.swing.JOptionPane.showMessageDialog(
                     this, "Cổng phải nằm trong khoảng 1–65535.");
             return false;
@@ -46,7 +49,6 @@ public class HomeForm extends javax.swing.JFrame {
                 this, "Cổng phải là số nguyên hợp lệ.");
         return false;
     }
-
     return true;
 }
 
@@ -370,7 +372,7 @@ public class HomeForm extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnBroadcastActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnBroadcastActionPerformed
-        if (!validateConnectionSettings()) {
+        if (!validateServerPort()) {
             return;
         }
         int port = Integer.parseInt(txtServerPort.getText().trim());

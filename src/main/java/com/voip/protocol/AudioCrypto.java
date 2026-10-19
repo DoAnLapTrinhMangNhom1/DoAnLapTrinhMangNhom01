@@ -1,35 +1,75 @@
 package com.voip.protocol;
 
+import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Arrays;
 
-/** Optional AES-CTR payload encryption. The same non-empty voip.key is required at both ends. */
+/** AES-GCM payload protection. A blank passphrase disables encryption. */
 public final class AudioCrypto {
-    private static final byte[] IV_DOMAIN = "VOIP-CTR".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] SALT = "voip-audio-demo-v2".getBytes(StandardCharsets.US_ASCII);
+    private static final int NONCE_BYTES = 12;
+    private static final int TAG_BITS = 128;
+    private static final int ITERATIONS = 120_000;
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private final SecretKeySpec key;
 
-    private AudioCrypto() {
+    public AudioCrypto(String passphrase) throws GeneralSecurityException {
+        if (passphrase == null || passphrase.isBlank()) {
+            key = null;
+            return;
+        }
+        char[] password = passphrase.toCharArray();
+        PBEKeySpec spec = new PBEKeySpec(password, SALT, ITERATIONS, 256);
+        try {
+            byte[] derived = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+                    .generateSecret(spec).getEncoded();
+            key = new SecretKeySpec(derived, "AES");
+            Arrays.fill(derived, (byte) 0);
+        } finally {
+            spec.clearPassword();
+            Arrays.fill(password, '\0');
+        }
     }
 
-    public static byte[] transform(byte[] data, String passphrase, int sequence, int timestamp)
-            throws GeneralSecurityException {
-        if (passphrase == null || passphrase.isBlank()) {
-            return data.clone();
+    public boolean isEnabled() {
+        return key != null;
+    }
+
+    public byte[] encrypt(byte[] plaintext, byte[] authenticatedHeader) throws GeneralSecurityException {
+        if (key == null) {
+            return plaintext.clone();
         }
-        byte[] key = MessageDigest.getInstance("SHA-256")
-                .digest(passphrase.getBytes(StandardCharsets.UTF_8));
-        ByteBuffer iv = ByteBuffer.allocate(16);
-        iv.putInt(timestamp);
-        iv.putShort((short) (sequence & 0xFFFF));
-        iv.put(IV_DOMAIN);
-        iv.putShort((short) 1);
-        Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"),
-                new IvParameterSpec(iv.array()));
-        return cipher.doFinal(data);
+        byte[] nonce = new byte[NONCE_BYTES];
+        RANDOM.nextBytes(nonce);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, nonce));
+        cipher.updateAAD(authenticatedHeader);
+        byte[] ciphertext = cipher.doFinal(plaintext);
+        ByteBuffer result = ByteBuffer.allocate(nonce.length + ciphertext.length);
+        result.put(nonce).put(ciphertext);
+        return result.array();
+    }
+
+    public byte[] decrypt(byte[] encrypted, byte[] authenticatedHeader)
+            throws GeneralSecurityException {
+        if (key == null) {
+            return encrypted.clone();
+        }
+        if (encrypted.length < NONCE_BYTES + TAG_BITS / 8) {
+            throw new AEADBadTagException("Gói mã hóa quá ngắn.");
+        }
+        byte[] nonce = Arrays.copyOf(encrypted, NONCE_BYTES);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, nonce));
+        cipher.updateAAD(authenticatedHeader);
+        return cipher.doFinal(encrypted, NONCE_BYTES, encrypted.length - NONCE_BYTES);
     }
 }

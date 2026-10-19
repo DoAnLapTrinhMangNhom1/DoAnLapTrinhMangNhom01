@@ -7,6 +7,7 @@ import com.voip.protocol.G711Codec;
 import com.voip.protocol.RTPPacket;
 
 import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -16,6 +17,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
@@ -27,39 +29,59 @@ import java.util.logging.Logger;
 
 public class AudioServer implements AudioCapture.AudioDataListener {
     private static final Logger LOGGER = Logger.getLogger(AudioServer.class.getName());
+    private static final int SAMPLES_PER_FRAME =
+            (int) (AudioConstants.SAMPLE_RATE * AudioConstants.FRAME_MS / 1000);
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final int port;
+    private final Path wavFile;
+    private final Mixer.Info inputDevice;
     private final AudioCapture audioCapture;
     private final Set<InetSocketAddress> clients = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<InetSocketAddress, Long> lastClientActivity =
             new ConcurrentHashMap<>();
     private final AtomicInteger sequence = new AtomicInteger();
+    private final AtomicInteger timestamp = new AtomicInteger(RANDOM.nextInt());
     private final AtomicLong packetsSent = new AtomicLong();
     private final AtomicLong bytesSent = new AtomicLong();
     private final String codec;
+    private final int payloadType;
     private final String encryptionKey;
+    private final AudioCrypto audioCrypto;
+    private volatile long ssrc = Integer.toUnsignedLong(RANDOM.nextInt());
     private volatile DatagramSocket serverSocket;
     private volatile boolean running;
-    private volatile Thread listenerThread;
+    private volatile boolean audioSourceEnded;
 
     public AudioServer(int port) {
-        this(port, null);
+        this(port, null, null);
     }
 
     public AudioServer(int port, Path wavFile) {
+        this(port, wavFile, null);
+    }
+
+    public AudioServer(int port, Path wavFile, Mixer.Info inputDevice) {
         if (port < 1 || port > 65535) {
             throw new IllegalArgumentException("Cổng UDP phải từ 1 đến 65535.");
         }
         this.port = port;
+        this.wavFile = wavFile;
+        this.inputDevice = inputDevice;
         codec = System.getProperty(AudioConstants.CODEC_PROPERTY, "pcm").trim().toLowerCase();
         if (!codec.equals("pcm") && !codec.equals("ulaw")) {
             throw new IllegalArgumentException("Codec không hỗ trợ: " + codec);
         }
+        payloadType = codec.equals("ulaw")
+                ? RTPPacket.PAYLOAD_TYPE_ULAW : RTPPacket.PAYLOAD_TYPE_PCM;
         encryptionKey = System.getProperty(AudioConstants.ENCRYPTION_KEY_PROPERTY, "");
+        try {
+            audioCrypto = new AudioCrypto(encryptionKey);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Không thể khởi tạo bảo vệ âm thanh.", e);
+        }
         audioCapture = new AudioCapture(this);
-        this.wavFile = wavFile;
     }
-
-    private final Path wavFile;
 
     public synchronized void startServer()
             throws IOException, LineUnavailableException, UnsupportedAudioFileException {
@@ -70,12 +92,15 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         socket.setSoTimeout(5000);
         serverSocket = socket;
         sequence.set(0);
+        timestamp.set(RANDOM.nextInt());
+        ssrc = Integer.toUnsignedLong(RANDOM.nextInt());
         packetsSent.set(0);
         bytesSent.set(0);
+        audioSourceEnded = false;
         running = true;
         try {
             if (wavFile == null) {
-                audioCapture.startCapture();
+                audioCapture.startCapture(inputDevice);
             } else {
                 audioCapture.startCapture(wavFile);
             }
@@ -87,31 +112,32 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             socket.close();
             throw e;
         }
-        listenerThread = new Thread(this::listenForClientRequests, "Server-UDP-Listener");
+        Thread listenerThread = new Thread(
+                () -> listenForClientRequests(socket), "Server-UDP-Listener");
         listenerThread.setDaemon(true);
         listenerThread.start();
         LOGGER.info("Audio server đang chạy trên UDP/" + port + " (" + codec + ").");
     }
 
-    private void listenForClientRequests() {
+    private void listenForClientRequests(DatagramSocket listenerSocket) {
         byte[] buffer = new byte[AudioConstants.MAX_UDP_PACKET_SIZE];
-        while (running) {
+        while (running && serverSocket == listenerSocket) {
             try {
                 DatagramPacket datagram = new DatagramPacket(buffer, buffer.length);
-                serverSocket.receive(datagram);
+                listenerSocket.receive(datagram);
                 InetSocketAddress client = new InetSocketAddress(
                         datagram.getAddress(), datagram.getPort());
-                RTPPacket rtp = RTPPacket.decode(
-                        Arrays.copyOf(datagram.getData(), datagram.getLength()), datagram.getLength());
-                if (rtp == null || rtp.getType() != RTPPacket.TYPE_CONTROL) {
-                    continue;
+                ControlMessage control = ControlMessage.decode(
+                        datagram.getData(), datagram.getLength());
+                if (control != null) {
+                    handleControl(client, control);
                 }
-                lastClientActivity.put(client, System.currentTimeMillis());
-                handleControl(client, ControlMessage.fromRtp(rtp));
             } catch (SocketTimeoutException e) {
-                removeInactiveClients();
+                if (running && serverSocket == listenerSocket) {
+                    removeInactiveClients();
+                }
             } catch (SocketException e) {
-                if (running) {
+                if (running && serverSocket == listenerSocket) {
                     LOGGER.log(Level.SEVERE, "Socket server gặp lỗi.", e);
                 }
                 break;
@@ -124,24 +150,29 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     }
 
     private void handleControl(InetSocketAddress client, ControlMessage control) {
-        if (control == null) {
-            return;
-        }
         switch (control.getCommand()) {
             case ControlMessage.JOIN -> {
+                if (control.getPayloadType() != payloadType
+                        || control.isEncrypted() != audioCrypto.isEnabled()) {
+                    sendControlResponse(client, ControlMessage.reject(
+                            "Codec hoặc chế độ mã hóa không khớp với server."));
+                    return;
+                }
                 registerClient(client);
-                sendControlResponse(client, ControlMessage.pong());
+                sendControlResponse(client, ControlMessage.accept(payloadType, audioCrypto.isEnabled()));
             }
             case ControlMessage.PING -> {
-                registerClient(client);
-                sendControlResponse(client, ControlMessage.pong());
+                if (clients.contains(client)) {
+                    lastClientActivity.put(client, System.currentTimeMillis());
+                    sendControlResponse(client, ControlMessage.pong(control.getToken()));
+                }
             }
             case ControlMessage.LEAVE -> {
                 clients.remove(client);
                 lastClientActivity.remove(client);
                 LOGGER.info("Client rời: " + client);
             }
-            default -> LOGGER.warning("Bỏ qua lệnh điều khiển không hỗ trợ.");
+            default -> LOGGER.fine("Bỏ qua phản hồi điều khiển từ client.");
         }
     }
 
@@ -157,8 +188,8 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         for (var entry : lastClientActivity.entrySet()) {
             if (entry.getValue() < inactiveBefore
                     && lastClientActivity.remove(entry.getKey(), entry.getValue())) {
-                    clients.remove(entry.getKey());
-                    LOGGER.info("Đã loại client mất heartbeat: " + entry.getKey());
+                clients.remove(entry.getKey());
+                LOGGER.info("Đã loại client mất heartbeat: " + entry.getKey());
             }
         }
     }
@@ -169,27 +200,31 @@ public class AudioServer implements AudioCapture.AudioDataListener {
             return;
         }
         int seq = sequence.getAndIncrement() & 0xFFFF;
-        int timestamp = (int) System.currentTimeMillis();
+        int ts = timestamp.getAndAdd(SAMPLES_PER_FRAME);
         try {
             byte[] payload = Arrays.copyOf(data, length);
-            if (codec.equals("ulaw")) {
+            if (payloadType == RTPPacket.PAYLOAD_TYPE_ULAW) {
                 payload = G711Codec.encode(payload);
             }
-            payload = AudioCrypto.transform(payload, encryptionKey, seq, timestamp);
-            RTPPacket rtp = new RTPPacket(RTPPacket.TYPE_LIVE, seq, timestamp,
-                    payload, payload.length);
-            byte[] wire = rtp.encode();
+            RTPPacket header = new RTPPacket(payloadType, seq, ts, ssrc, new byte[0]);
+            payload = audioCrypto.encrypt(payload, header.getHeaderBytes());
+            byte[] wire = new RTPPacket(payloadType, seq, ts, ssrc, payload).encode();
             for (InetSocketAddress client : clients) {
                 sendBytes(client, wire);
             }
         } catch (GeneralSecurityException e) {
-            LOGGER.log(Level.SEVERE, "Không thể mã hóa gói âm thanh.", e);
+            LOGGER.log(Level.SEVERE, "Không thể bảo vệ gói âm thanh.", e);
         }
     }
 
+    @Override
+    public void onAudioSourceEnded() {
+        audioSourceEnded = true;
+        LOGGER.info("Đã phát hết tệp WAV.");
+    }
+
     private void sendControlResponse(InetSocketAddress client, ControlMessage control) {
-        byte[] wire = control.toRtpPacket().encode();
-        sendBytes(client, wire);
+        sendBytes(client, control.encode());
     }
 
     private void sendBytes(InetSocketAddress client, byte[] wire) {
@@ -226,6 +261,10 @@ public class AudioServer implements AudioCapture.AudioDataListener {
         return running;
     }
 
+    public boolean isAudioSourceEnded() {
+        return audioSourceEnded;
+    }
+
     public int getPort() {
         return port;
     }
@@ -249,5 +288,4 @@ public class AudioServer implements AudioCapture.AudioDataListener {
     public String getCodec() {
         return codec;
     }
-
 }

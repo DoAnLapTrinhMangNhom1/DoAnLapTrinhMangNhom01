@@ -2,86 +2,125 @@ package com.voip.protocol;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 
-/**
- * Lệnh điều khiển nhét trong {@link RTPPacket#TYPE_CONTROL}.
- *
- * <pre>
- * 1 byte command: JOIN=1, LEAVE=2, PING=3, PONG=4
- * 4 byte sequence (dành riêng, hiện luôn = 0)
- * </pre>
- */
-public class ControlMessage {
-
+/** Small application control datagram, separate from standard RTP media packets. */
+public final class ControlMessage {
     public static final byte JOIN = 1;
     public static final byte LEAVE = 2;
     public static final byte PING = 3;
     public static final byte PONG = 4;
+    public static final byte ACCEPT = 5;
+    public static final byte REJECT = 6;
 
-    private static final int SIZE = 5;
+    private static final byte[] MAGIC = {'V', 'O', 'I', 'P'};
+    private static final byte VERSION = 1;
+    private static final int HEADER_SIZE = 20;
+    private static final int MAX_MESSAGE_BYTES = 256;
 
     private final byte command;
-    private final int sequence;
+    private final int payloadType;
+    private final boolean encrypted;
+    private final long token;
+    private final String message;
 
-    public ControlMessage(byte command, int sequence) {
+    private ControlMessage(byte command, int payloadType, boolean encrypted, long token, String message) {
         this.command = command;
-        this.sequence = sequence;
+        this.payloadType = payloadType;
+        this.encrypted = encrypted;
+        this.token = token;
+        this.message = message == null ? "" : message;
     }
 
-    public static ControlMessage join() {
-        return new ControlMessage(JOIN, 0);
+    public static ControlMessage join(int payloadType, boolean encrypted) {
+        return new ControlMessage(JOIN, payloadType, encrypted, 0, "");
     }
 
     public static ControlMessage leave() {
-        return new ControlMessage(LEAVE, 0);
+        return new ControlMessage(LEAVE, 0, false, 0, "");
     }
 
-    public static ControlMessage ping() {
-        return new ControlMessage(PING, 0);
+    public static ControlMessage ping(long token) {
+        return new ControlMessage(PING, 0, false, token, "");
     }
 
-    public static ControlMessage pong() {
-        return new ControlMessage(PONG, 0);
+    public static ControlMessage pong(long token) {
+        return new ControlMessage(PONG, 0, false, token, "");
+    }
+
+    public static ControlMessage accept(int payloadType, boolean encrypted) {
+        return new ControlMessage(ACCEPT, payloadType, encrypted, 0, "");
+    }
+
+    public static ControlMessage reject(String message) {
+        return new ControlMessage(REJECT, 0, false, 0, message);
     }
 
     public byte[] encode() {
-        ByteBuffer buffer = ByteBuffer.allocate(SIZE).order(ByteOrder.BIG_ENDIAN);
+        byte[] text = message.getBytes(StandardCharsets.UTF_8);
+        if (text.length > MAX_MESSAGE_BYTES) {
+            throw new IllegalArgumentException("Thông báo điều khiển quá dài.");
+        }
+        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + text.length).order(ByteOrder.BIG_ENDIAN);
+        buffer.put(MAGIC);
+        buffer.put(VERSION);
         buffer.put(command);
-        buffer.putInt(sequence);
+        buffer.put((byte) payloadType);
+        buffer.put((byte) (encrypted ? 1 : 0));
+        buffer.putLong(token);
+        buffer.putShort((short) text.length);
+        buffer.putShort((short) 0);
+        buffer.put(text);
         return buffer.array();
     }
 
-    public static ControlMessage decode(byte[] payload) {
-        if (payload == null || payload.length < SIZE) {
+    public static ControlMessage decode(byte[] data, int length) {
+        if (data == null || length < HEADER_SIZE || length > data.length
+                || length > HEADER_SIZE + MAX_MESSAGE_BYTES) {
             return null;
         }
-        ByteBuffer buffer = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(data, 0, length).order(ByteOrder.BIG_ENDIAN);
+        for (byte expected : MAGIC) {
+            if (buffer.get() != expected) {
+                return null;
+            }
+        }
+        if (buffer.get() != VERSION) {
+            return null;
+        }
         byte command = buffer.get();
-        int sequence = buffer.getInt();
-        if (command < JOIN || command > PONG) {
+        int payloadType = Byte.toUnsignedInt(buffer.get());
+        int encryptedByte = Byte.toUnsignedInt(buffer.get());
+        long token = buffer.getLong();
+        int messageLength = Short.toUnsignedInt(buffer.getShort());
+        buffer.getShort();
+        if (command < JOIN || command > REJECT || payloadType > 127 || encryptedByte > 1
+                || messageLength != length - HEADER_SIZE) {
             return null;
         }
-        return new ControlMessage(command, sequence);
-    }
-
-    /** Bọc thành gói UDP để Client gửi cho Server. */
-    public RTPPacket toRtpPacket() {
-        byte[] payload = encode();
-        return new RTPPacket(RTPPacket.TYPE_CONTROL, 0, 0, payload, payload.length);
-    }
-
-    public static ControlMessage fromRtp(RTPPacket packet) {
-        if (packet == null || packet.getType() != RTPPacket.TYPE_CONTROL) {
-            return null;
-        }
-        return decode(packet.getPayload());
+        byte[] messageBytes = new byte[messageLength];
+        buffer.get(messageBytes);
+        return new ControlMessage(command, payloadType, encryptedByte == 1, token,
+                new String(messageBytes, StandardCharsets.UTF_8));
     }
 
     public byte getCommand() {
         return command;
     }
 
-    public int getSequence() {
-        return sequence;
+    public int getPayloadType() {
+        return payloadType;
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
+    }
+
+    public long getToken() {
+        return token;
+    }
+
+    public String getMessage() {
+        return message;
     }
 }

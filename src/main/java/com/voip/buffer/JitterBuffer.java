@@ -32,7 +32,7 @@ public class JitterBuffer {
     }
 
     public void addPacket(RTPPacket packet) {
-        if (packet == null || packet.getType() != RTPPacket.TYPE_LIVE) {
+        if (packet == null) {
             return;
         }
         lock.lock();
@@ -107,8 +107,7 @@ public class JitterBuffer {
                     return acceptPacket(packet);
                 }
                 byte[] concealment = concealLastFrame();
-                return new RTPPacket(RTPPacket.TYPE_LIVE, playedSequence, 0,
-                        concealment, concealment.length);
+                return new RTPPacket(RTPPacket.PAYLOAD_TYPE_PCM, playedSequence, 0, 0, concealment);
             }
             return null;
         } catch (InterruptedException e) {
@@ -155,6 +154,15 @@ public class JitterBuffer {
 
     public int getBufferSizeMs() {
         return bufferSizeMs;
+    }
+
+    public int getEffectiveBufferSizeMs() {
+        lock.lock();
+        try {
+            return capacity * AudioConstants.FRAME_MS;
+        } finally {
+            lock.unlock();
+        }
     }
 
     public int size() {

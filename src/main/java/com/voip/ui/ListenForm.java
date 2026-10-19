@@ -414,7 +414,7 @@ public class ListenForm extends javax.swing.JFrame {
         lblLatency.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblLatency.setForeground(new java.awt.Color(255, 255, 255));
         lblLatency.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblLatency.setText("Latency(ms): --ms");
+        lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
 
         javax.swing.GroupLayout jPanel18Layout = new javax.swing.GroupLayout(jPanel18);
         jPanel18.setLayout(jPanel18Layout);
@@ -483,7 +483,7 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel31.setForeground(new java.awt.Color(255, 255, 255));
         jLabel31.setText("Mức đệm");
 
-        cboJitterBuffer.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "50ms", "75ms", "100ms", "150ms", "250ms", "500ms" }));
+        cboJitterBuffer.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "50ms", "75ms", "100ms", "200ms", "300ms", "400ms", "500ms" }));
         cboJitterBuffer.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 cboJitterBufferActionPerformed(evt);
@@ -739,7 +739,7 @@ public class ListenForm extends javax.swing.JFrame {
         lblPacketsReceived.setText("Gói nhận: 0");
         lblPacketsLost.setText("Gói mất: 0");
         lblPacketLossRate.setText("Tỷ lệ mất gói: 0.00%");
-        lblLatency.setText("Latency: -- ms");
+        lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
         lblJitter.setText("Jitter: -- ms");
         lblBytesReceived.setText("Dung lượng nhận: 0 KB");
         txtLog.append("Đã yêu cầu đặt lại thống kê.\n");
@@ -778,18 +778,41 @@ public class ListenForm extends javax.swing.JFrame {
         if (audioClient == null) {
             return;
         }
-        jLabel5.setText(audioClient.isServerReachable() ? "Đã kết nối" : "Đang chờ Server");
+        if (audioClient.isConnectionAccepted() && audioClient.isServerReachable()) {
+            long authenticationFailures = audioClient.getAuthenticationFailures();
+            jLabel5.setText(authenticationFailures == 0 ? "Đã kết nối"
+                    : "Đã kết nối • gói sai khóa: " + authenticationFailures);
+        } else if (audioClient.isConnectionAccepted()) {
+            jLabel5.setText("Mất kết nối • đang chờ phản hồi");
+        } else {
+            jLabel5.setText(audioClient.getConnectionMessage());
+        }
+        jLabel5.setToolTipText(audioClient.getConnectionMessage());
         lblPacketsReceived.setText("Gói nhận: " + audioClient.getPacketsReceived());
         lblPacketsLost.setText("Gói mất: " + audioClient.getPacketsLost());
         lblPacketLossRate.setText(String.format("Tỷ lệ mất gói: %.2f%%",
                 audioClient.getPacketLossRate()));
-        lblLatency.setText("Latency: " + audioClient.getAvgLatency() + " ms");
-        lblJitter.setText(String.format("Jitter: %.2f ms", audioClient.getCurrentJitter()));
+        double oneWayEstimate = audioClient.getEstimatedOneWayLatencyMs();
+        if (Double.isNaN(oneWayEstimate)) {
+            lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
+            lblJitter.setText(String.format("Jitter: %.2f ms", audioClient.getCurrentJitter()));
+        } else {
+            double effectiveBufferMs = jitterBuffer == null
+                    ? 0 : jitterBuffer.getEffectiveBufferSizeMs();
+            double bufferedEstimate = oneWayEstimate + AudioConstants.FRAME_MS + effectiveBufferMs;
+            lblLatency.setText(String.format("Mạng (RTT/2): %.1f ms", oneWayEstimate));
+            lblLatency.setToolTipText("Ước tính mạng từ một nửa RTT điều khiển; không phải latency end-to-end.");
+            lblJitter.setText(String.format("Jitter %.2f ms • Mạng + frame + đệm ≈ %.1f ms%s",
+                    audioClient.getCurrentJitter(), bufferedEstimate,
+                    bufferedEstimate >= 150 ? " (trên mục tiêu 150 ms)" : ""));
+            lblJitterBuffer.setToolTipText("Mức hiệu lực được làm tròn theo frame 20 ms.");
+        }
         lblBytesReceived.setText(String.format("Dung lượng nhận: %d KB",
                 audioClient.getKilobytesReceived()));
         if (jitterBuffer != null) {
-            lblJitterBuffer.setText("Jitter Buffer: " + jitterBuffer.getBufferSizeMs()
-                    + " ms • " + jitterBuffer.size() + " gói đang đệm");
+            lblJitterBuffer.setText("Buffer: " + jitterBuffer.getBufferSizeMs() + "→"
+                    + jitterBuffer.getEffectiveBufferSizeMs() + " ms • "
+                    + jitterBuffer.size() + " gói");
         }
     }
 

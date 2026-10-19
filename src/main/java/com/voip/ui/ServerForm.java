@@ -5,6 +5,7 @@
 package com.voip.ui;
 
 import com.voip.protocol.AudioConstants;
+import com.voip.server.AudioCapture;
 import com.voip.server.AudioServer;
 
 import javax.swing.SwingWorker;
@@ -12,6 +13,10 @@ import javax.swing.Timer;
 import javax.swing.table.DefaultTableModel;
 import java.io.File;
 import java.nio.file.Path;
+import javax.sound.sampled.Mixer;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JList;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -34,6 +39,7 @@ public class ServerForm extends javax.swing.JFrame {
         this.port = port;
         initComponents();
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        initializeInputDevices();
         lblUdpPort.setText("UDP Port: " + port);
         btnStopBroadcast.setEnabled(false);
         btnRefreshClients.addActionListener(event -> refreshServerStatus());
@@ -42,7 +48,26 @@ public class ServerForm extends javax.swing.JFrame {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent event) {
+                if (statusTimer != null) {
+                    statusTimer.stop();
+                }
                 stopServer();
+            }
+        });
+    }
+
+    private void initializeInputDevices() {
+        DefaultComboBoxModel<Mixer.Info> model = new DefaultComboBoxModel<>();
+        model.addElement(null);
+        AudioCapture.getSupportedInputDevices().forEach(model::addElement);
+        jComboBox1.setModel(model);
+        jComboBox1.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(
+                    JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                setText(value instanceof Mixer.Info info ? info.getName() : "Thiết bị mặc định");
+                return this;
             }
         });
     }
@@ -289,7 +314,7 @@ public class ServerForm extends javax.swing.JFrame {
         lblMicLevel1.setForeground(new java.awt.Color(255, 255, 255));
         lblMicLevel1.setText(" Thiết bị đầu vào");
 
-        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>());
 
         javax.swing.GroupLayout pnlMicMonitorLayout = new javax.swing.GroupLayout(pnlMicMonitor);
         pnlMicMonitor.setLayout(pnlMicMonitorLayout);
@@ -425,12 +450,14 @@ public class ServerForm extends javax.swing.JFrame {
             wavFile = selected.toPath();
         }
         Path selectedWav = wavFile;
+        Mixer.Info selectedInput = (Mixer.Info) jComboBox1.getSelectedItem();
         btnStartBroadcast.setEnabled(false);
+        jComboBox1.setEnabled(false);
         lblServerStatus.setText("Đang khởi động...");
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() throws Exception {
-                audioServer = new AudioServer(port, selectedWav);
+                audioServer = new AudioServer(port, selectedWav, selectedInput);
                 audioServer.startServer();
                 return null;
             }
@@ -449,6 +476,7 @@ public class ServerForm extends javax.swing.JFrame {
                     audioServer = null;
                     showStartError(e.getCause());
                     btnStartBroadcast.setEnabled(true);
+                    jComboBox1.setEnabled(true);
                     lblServerStatus.setText("Chưa phát");
                 }
             }
@@ -460,9 +488,6 @@ public class ServerForm extends javax.swing.JFrame {
     }//GEN-LAST:event_btnStopBroadcastActionPerformed
 
     private void stopServer() {
-        if (statusTimer != null) {
-            statusTimer.stop();
-        }
         if (audioServer != null) {
             audioServer.stopServer();
             audioServer = null;
@@ -470,6 +495,7 @@ public class ServerForm extends javax.swing.JFrame {
         lblServerStatus.setText("Đã dừng phát");
         lblServerFooterStatus.setText("Server đã dừng");
         btnStartBroadcast.setEnabled(true);
+        jComboBox1.setEnabled(true);
         btnStopBroadcast.setEnabled(false);
         refreshServerStatus();
     }
@@ -478,6 +504,12 @@ public class ServerForm extends javax.swing.JFrame {
         AudioServer current = audioServer;
         if (current == null) {
             return;
+        }
+        if (current.isAudioSourceEnded()) {
+            lblServerStatus.setText("Đã phát hết tệp WAV");
+            lblServerFooterStatus.setText("Nguồn WAV đã kết thúc");
+            btnStartBroadcast.setEnabled(false);
+            btnStopBroadcast.setEnabled(true);
         }
         lblClientCount.setText("Số người nghe: " + current.getClientCount());
         lblMicLevel.setText("Đã gửi: " + current.getPacketsSent() + " gói • "
@@ -539,7 +571,7 @@ public class ServerForm extends javax.swing.JFrame {
     private javax.swing.JButton btnRefreshClients;
     private javax.swing.JButton btnStartBroadcast;
     private javax.swing.JButton btnStopBroadcast;
-    private javax.swing.JComboBox<String> jComboBox1;
+    private javax.swing.JComboBox<Mixer.Info> jComboBox1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;

@@ -7,11 +7,14 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,6 +29,9 @@ public class AudioCapture implements Runnable {
 
     public interface AudioDataListener {
         void onAudioDataCaptured(byte[] data, int length);
+
+        default void onAudioSourceEnded() {
+        }
     }
 
     public AudioCapture(AudioDataListener listener) {
@@ -36,12 +42,21 @@ public class AudioCapture implements Runnable {
     }
 
     public synchronized void startCapture() throws LineUnavailableException {
+        startCapture((Mixer.Info) null);
+    }
+
+    public synchronized void startCapture(Mixer.Info inputDevice) throws LineUnavailableException {
         ensureStopped();
         DataLine.Info info = new DataLine.Info(TargetDataLine.class, audioFormat);
-        if (!AudioSystem.isLineSupported(info)) {
+        Mixer mixer = inputDevice == null ? null : AudioSystem.getMixer(inputDevice);
+        boolean supported = mixer == null
+                ? AudioSystem.isLineSupported(info)
+                : mixer.isLineSupported(info);
+        if (!supported) {
             throw new LineUnavailableException("Microphone không hỗ trợ định dạng 16 kHz PCM mono.");
         }
-        TargetDataLine line = (TargetDataLine) AudioSystem.getLine(info);
+        TargetDataLine line = (TargetDataLine) (mixer == null
+                ? AudioSystem.getLine(info) : mixer.getLine(info));
         try {
             line.open(audioFormat);
             line.start();
@@ -78,9 +93,10 @@ public class AudioCapture implements Runnable {
     }
 
     private void ensureStopped() {
-        if (running) {
+        if (running || (captureThread != null && captureThread.isAlive())) {
             throw new IllegalStateException("Nguồn âm thanh đang chạy.");
         }
+        captureThread = null;
     }
 
     private void startThread() {
@@ -105,14 +121,40 @@ public class AudioCapture implements Runnable {
             }
             audioInputStream = null;
         }
-        if (captureThread != null) {
-            captureThread.interrupt();
-            captureThread = null;
+        Thread thread = captureThread;
+        if (thread != null) {
+            thread.interrupt();
+            if (thread != Thread.currentThread()) {
+                try {
+                    thread.join(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            if (!thread.isAlive()) {
+                captureThread = null;
+            } else {
+                LOGGER.warning("Luồng thu âm chưa dừng sau khi đóng nguồn.");
+            }
         }
     }
 
     public AudioFormat getAudioFormat() {
         return audioFormat;
+    }
+
+    public static List<Mixer.Info> getSupportedInputDevices() {
+        AudioFormat format = new AudioFormat(AudioConstants.SAMPLE_RATE,
+                AudioConstants.SAMPLE_SIZE_BITS, AudioConstants.CHANNELS,
+                AudioConstants.SIGNED, AudioConstants.BIG_ENDIAN);
+        DataLine.Info lineInfo = new DataLine.Info(TargetDataLine.class, format);
+        List<Mixer.Info> devices = new ArrayList<>();
+        for (Mixer.Info mixerInfo : AudioSystem.getMixerInfo()) {
+            if (AudioSystem.getMixer(mixerInfo).isLineSupported(lineInfo)) {
+                devices.add(mixerInfo);
+            }
+        }
+        return List.copyOf(devices);
     }
 
     @Override
@@ -121,11 +163,13 @@ public class AudioCapture implements Runnable {
         long nextFrameTime = System.nanoTime();
         TargetDataLine line = targetDataLine;
         AudioInputStream stream = audioInputStream;
+        boolean reachedEndOfInput = false;
         try {
             while (running) {
                 int bytesRead = line != null ? readFullFrame(line, frame)
                         : readFullFrame(stream, frame);
                 if (bytesRead < 0) {
+                    reachedEndOfInput = stream != null;
                     break;
                 }
                 if (bytesRead == frame.length && listener != null) {
@@ -145,6 +189,9 @@ public class AudioCapture implements Runnable {
             }
         } finally {
             running = false;
+            if (reachedEndOfInput && listener != null) {
+                listener.onAudioSourceEnded();
+            }
         }
     }
 
