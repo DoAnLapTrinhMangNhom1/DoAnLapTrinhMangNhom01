@@ -13,8 +13,9 @@ public final class G711Codec {
 
     public static byte[] encode(byte[] pcm) {
         if (pcm == null || (pcm.length & 1) != 0) {
-            throw new IllegalArgumentException("PCM 16-bit phải có số byte chẵn.");
+            throw new IllegalArgumentException("PCM 16-bit phai co so byte chan.");
         }
+        // Moi mau PCM 16-bit duoc nen thanh mot byte mu-law.
         byte[] encoded = new byte[pcm.length / 2];
         for (int i = 0; i < encoded.length; i++) {
             int sample = (short) (((pcm[i * 2] & 0xFF) << 8) | (pcm[i * 2 + 1] & 0xFF));
@@ -42,6 +43,7 @@ public final class G711Codec {
             mask = 0xFF;
         }
         sample = Math.min(sample, CLIP) + BIAS;
+        // Segment bieu dien bien do; 4 bit con lai giu phan dinh tri cua mau.
         int segment = 0;
         while (segment < SEGMENT_END.length && sample > SEGMENT_END[segment]) {
             segment++;

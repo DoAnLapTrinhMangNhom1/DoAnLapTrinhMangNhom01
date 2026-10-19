@@ -57,6 +57,7 @@ public class ServerForm extends javax.swing.JFrame {
     }
 
     private void initializeInputDevices() {
+        // Chi hien thi mixer ho tro dung dinh dang ma AudioCapture su dung.
         DefaultComboBoxModel<Mixer.Info> model = new DefaultComboBoxModel<>();
         model.addElement(null);
         AudioCapture.getSupportedInputDevices().forEach(model::addElement);
@@ -66,7 +67,7 @@ public class ServerForm extends javax.swing.JFrame {
             public java.awt.Component getListCellRendererComponent(
                     JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                setText(value instanceof Mixer.Info info ? info.getName() : "Thiết bị mặc định");
+                setText(value instanceof Mixer.Info info ? info.getName() : "Thiet bi mac dinh");
                 return this;
             }
         });
@@ -118,13 +119,13 @@ public class ServerForm extends javax.swing.JFrame {
 
         jLabel2.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel2.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel2.setText("Truyền âm thanh đến nhiều Client qua UDP");
+        jLabel2.setText("Truyen am thanh den nhieu Client qua UDP");
 
         jPanel2.setBackground(new java.awt.Color(0, 51, 102));
         jPanel2.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(51, 153, 0)));
 
         lblServerStatus.setForeground(new java.awt.Color(255, 255, 255));
-        lblServerStatus.setText("Chưa phát");
+        lblServerStatus.setText("Chua phat");
 
         lblUdpPort.setForeground(new java.awt.Color(255, 255, 255));
         lblUdpPort.setText("UDP Port: --");
@@ -152,7 +153,7 @@ public class ServerForm extends javax.swing.JFrame {
         btnStartBroadcast.setBackground(new java.awt.Color(51, 102, 255));
         btnStartBroadcast.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         btnStartBroadcast.setForeground(new java.awt.Color(255, 255, 255));
-        btnStartBroadcast.setText("Bắt đầu phát");
+        btnStartBroadcast.setText("Bat dau phat");
         btnStartBroadcast.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnStartBroadcastActionPerformed(evt);
@@ -162,7 +163,7 @@ public class ServerForm extends javax.swing.JFrame {
         btnStopBroadcast.setBackground(new java.awt.Color(255, 51, 51));
         btnStopBroadcast.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         btnStopBroadcast.setForeground(new java.awt.Color(255, 255, 255));
-        btnStopBroadcast.setText("Dừng phát");
+        btnStopBroadcast.setText("Dung phat");
         btnStopBroadcast.setActionCommand("");
         btnStopBroadcast.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -212,7 +213,7 @@ public class ServerForm extends javax.swing.JFrame {
 
         jLabel3.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel3.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel3.setText("CLIENT ĐANG KẾT NỐI");
+        jLabel3.setText("CLIENT DANG KET NOI");
 
         jScrollPane1.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 102, 255)));
 
@@ -224,19 +225,19 @@ public class ServerForm extends javax.swing.JFrame {
                 {null, null, null, null}
             },
             new String [] {
-                "STT", "Địa chỉ IP", "Port", "Trạng thái"
+                "STT", "Dia chi IP", "Port", "Trang thai"
             }
         ));
         jScrollPane1.setViewportView(tblClients);
 
         lblClientCount.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblClientCount.setForeground(new java.awt.Color(255, 255, 255));
-        lblClientCount.setText("Số người nghe: 0");
+        lblClientCount.setText("So nguoi nghe: 0");
 
         btnRefreshClients.setBackground(new java.awt.Color(51, 102, 255));
         btnRefreshClients.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
         btnRefreshClients.setForeground(new java.awt.Color(255, 255, 255));
-        btnRefreshClients.setText("Làm mới");
+        btnRefreshClients.setText("Lam moi");
 
         javax.swing.GroupLayout pnlClientsLayout = new javax.swing.GroupLayout(pnlClients);
         pnlClients.setLayout(pnlClientsLayout);
@@ -279,7 +280,7 @@ public class ServerForm extends javax.swing.JFrame {
 
         lblMicTitle.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         lblMicTitle.setForeground(new java.awt.Color(255, 255, 255));
-        lblMicTitle.setText("CƯỜNG ĐỘ MICROPHONE");
+        lblMicTitle.setText("CUONG DO MICROPHONE");
 
         pnlWaveform.setBackground(new java.awt.Color(0, 51, 102));
         pnlWaveform.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
@@ -303,7 +304,7 @@ public class ServerForm extends javax.swing.JFrame {
 
         lblMicLevel1.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblMicLevel1.setForeground(new java.awt.Color(255, 255, 255));
-        lblMicLevel1.setText(" Thiết bị đầu vào");
+        lblMicLevel1.setText(" Thiet bi dau vao");
 
         javax.swing.GroupLayout pnlMicMonitorLayout = new javax.swing.GroupLayout(pnlMicMonitor);
         pnlMicMonitor.setLayout(pnlMicMonitorLayout);
@@ -339,11 +340,11 @@ public class ServerForm extends javax.swing.JFrame {
 
         lblServerFooterStatus.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         lblServerFooterStatus.setForeground(new java.awt.Color(255, 255, 255));
-        lblServerFooterStatus.setText("Server sẵn sàng");
+        lblServerFooterStatus.setText("Server san sang");
 
         lblProtocol.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         lblProtocol.setForeground(new java.awt.Color(255, 255, 255));
-        lblProtocol.setText("UDP • RTP • Java Sound API");
+        lblProtocol.setText("UDP - RTP - Java Sound API");
 
         javax.swing.GroupLayout pnlFooterLayout = new javax.swing.GroupLayout(pnlFooter);
         pnlFooter.setLayout(pnlFooterLayout);
@@ -411,9 +412,9 @@ public class ServerForm extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnStartBroadcastActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartBroadcastActionPerformed
-        Object[] sources = {"Microphone", "Chọn tệp WAV", "Hủy"};
+        Object[] sources = {"Microphone", "Chon tep WAV", "Huy"};
         int sourceChoice = javax.swing.JOptionPane.showOptionDialog(this,
-                "Chọn nguồn âm thanh để phát.", "Nguồn âm thanh",
+                "Chon nguon am thanh de phat.", "Nguon am thanh",
                 javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE,
                 null, sources, sources[0]);
         if (sourceChoice == 2 || sourceChoice < 0) {
@@ -423,7 +424,7 @@ public class ServerForm extends javax.swing.JFrame {
         if (sourceChoice == 1) {
             javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
             chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                    "Tệp WAV", "wav"));
+                    "Tep WAV", "wav"));
             if (chooser.showOpenDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) {
                 return;
             }
@@ -432,9 +433,10 @@ public class ServerForm extends javax.swing.JFrame {
         }
         Path selectedWav = wavFile;
         Mixer.Info selectedInput = (Mixer.Info) jComboBox1.getSelectedItem();
+        // Mo microphone/socket co the chan; SwingWorker giu giao dien phan hoi trong luc khoi dong.
         btnStartBroadcast.setEnabled(false);
         jComboBox1.setEnabled(false);
-        lblServerStatus.setText("Đang khởi động...");
+        lblServerStatus.setText("Dang khoi dong...");
         new SwingWorker<AudioServer, Void>() {
             @Override
             protected AudioServer doInBackground() throws Exception {
@@ -446,9 +448,10 @@ public class ServerForm extends javax.swing.JFrame {
             @Override
             protected void done() {
                 try {
+                    // Chi luu server sau khi khoi dong thanh cong de tranh trang thai null/gia thanh cong.
                     audioServer = get();
-                    lblServerStatus.setText("Đang phát");
-                    lblServerFooterStatus.setText("Server đang phát • " + audioServer.getCodec());
+                    lblServerStatus.setText("Dang phat");
+                    lblServerFooterStatus.setText("Server dang phat - " + audioServer.getCodec());
                     jComboBox1.setEnabled(false);
                     btnStopBroadcast.setEnabled(true);
                 } catch (InterruptedException e) {
@@ -456,13 +459,13 @@ public class ServerForm extends javax.swing.JFrame {
                     showStartError(e);
                     btnStartBroadcast.setEnabled(true);
                     jComboBox1.setEnabled(true);
-                    lblServerStatus.setText("Chưa phát");
+                    lblServerStatus.setText("Chua phat");
                 } catch (ExecutionException e) {
                     audioServer = null;
                     showStartError(e.getCause());
                     btnStartBroadcast.setEnabled(true);
                     jComboBox1.setEnabled(true);
-                    lblServerStatus.setText("Chưa phát");
+                    lblServerStatus.setText("Chua phat");
                 }
             }
         }.execute();
@@ -477,13 +480,13 @@ public class ServerForm extends javax.swing.JFrame {
             audioServer.stopServer();
             audioServer = null;
         }
-        lblServerStatus.setText("Đã dừng phát");
-        lblServerFooterStatus.setText("Server đã dừng");
+        lblServerStatus.setText("Da dung phat");
+        lblServerFooterStatus.setText("Server da dung");
         btnStartBroadcast.setEnabled(true);
         jComboBox1.setEnabled(true);
         btnStopBroadcast.setEnabled(false);
         jProgressBar2.setValue(0);
-        jProgressBar2.setString("Mức tín hiệu: 0%");
+        jProgressBar2.setString("Muc tin hieu: 0%");
         refreshServerStatus();
     }
 
@@ -493,33 +496,33 @@ public class ServerForm extends javax.swing.JFrame {
             return;
         }
         if (current.isAudioSourceEnded()) {
-            lblServerStatus.setText("Đã phát hết tệp WAV");
-            lblServerFooterStatus.setText("Nguồn WAV đã kết thúc");
+            lblServerStatus.setText("Da phat het tep WAV");
+            lblServerFooterStatus.setText("Nguon WAV da ket thuc");
             btnStartBroadcast.setEnabled(false);
             btnStopBroadcast.setEnabled(true);
         }
         String captureError = current.getAudioCaptureError();
         if (captureError != null) {
-            lblServerStatus.setText("Lỗi thu âm");
+            lblServerStatus.setText("Loi thu am");
             lblServerFooterStatus.setText(captureError);
         }
         int inputLevel = current.getInputLevelPercent();
         jProgressBar2.setValue(inputLevel);
-        jProgressBar2.setString("Mức tín hiệu: " + inputLevel + "%");
-        lblClientCount.setText("Số người nghe: " + current.getClientCount());
+        jProgressBar2.setString("Muc tin hieu: " + inputLevel + "%");
+        lblClientCount.setText("So nguoi nghe: " + current.getClientCount());
         DefaultTableModel model = (DefaultTableModel) tblClients.getModel();
         model.setRowCount(0);
         int row = 1;
         for (java.net.InetSocketAddress address : current.getClients()) {
             model.addRow(new Object[]{row++, address.getAddress().getHostAddress(),
-                    address.getPort(), "Đang nghe"});
+                    address.getPort(), "Dang nghe"});
         }
     }
 
     private void showStartError(Throwable error) {
         javax.swing.JOptionPane.showMessageDialog(this,
-                "Không thể khởi động server: " + error.getMessage(),
-                "Lỗi phát âm thanh", javax.swing.JOptionPane.ERROR_MESSAGE);
+                "Khong the khoi dong server: " + error.getMessage(),
+                "Loi phat am thanh", javax.swing.JOptionPane.ERROR_MESSAGE);
     }
 
     /**

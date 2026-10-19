@@ -76,7 +76,7 @@ public class AudioPlayback implements Runnable {
                     }
                 }
             } catch (Exception e) {
-                // Bỏ qua mixer lỗi
+                // Bo qua mixer loi
             }
         }
         return speakers;
@@ -94,11 +94,11 @@ public class AudioPlayback implements Runnable {
         boolean wasPlaying = playing;
         stopPlayback();
 
-        // Clear jitter buffer để tránh old audio data conflicts với device mới
+        // Clear jitter buffer de tranh old audio data conflicts voi device moi
         jitterBuffer.clear();
 
         try {
-            Thread.sleep(200); // Tăng delay từ 100ms → 200ms để đảm bảo cleanup hoàn toàn
+            Thread.sleep(200); // Tang delay tu 100ms -> 200ms de dam bao cleanup hoan toan
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -120,7 +120,7 @@ public class AudioPlayback implements Runnable {
         if (selectedMixer != null && !isCurrentDeviceAvailable()) {
             Mixer.Info oldDevice = selectedMixer;
             selectedMixer = null;
-            LOGGER.info("Device " + oldDevice.getName() + " không còn available, chuyển sang default");
+            LOGGER.info("Device " + oldDevice.getName() + " khong con available, chuyen sang default");
 
             if (deviceChangeListener != null) {
                 deviceChangeListener.onDeviceRemoved(oldDevice);
@@ -171,16 +171,17 @@ public class AudioPlayback implements Runnable {
             Mixer mixer = AudioSystem.getMixer(selectedMixer);
             if (!mixer.isLineSupported(info)) {
                 throw new LineUnavailableException(
-                    "Loa '" + selectedMixer.getName() + "' không hỗ trợ định dạng 16 kHz PCM mono.");
+                    "Loa '" + selectedMixer.getName() + "' khong ho tro dinh dang 16 kHz PCM mono.");
             }
             line = (SourceDataLine) mixer.getLine(info);
         } else {
             if (!AudioSystem.isLineSupported(info)) {
-                throw new LineUnavailableException("Thiết bị phát không hỗ trợ PCM 16 kHz mono.");
+                throw new LineUnavailableException("Thiet bi phat khong ho tro PCM 16 kHz mono.");
             }
             line = (SourceDataLine) AudioSystem.getLine(info);
         }
 
+        // Bo dem thiet bi chua hai frame de giam nguy co underrun ma khong tich luy qua nhieu tre.
         line.open(format, AudioConstants.PCM_FRAME_BYTES * 2);
         line.start();
         speakers = line;
@@ -264,7 +265,7 @@ public class AudioPlayback implements Runnable {
     public void run() {
         try {
             while (playing) {
-                // Lấy gói tin tiếp theo từ Jitter Buffer
+                // Buffer tra PCM theo thu tu; SourceDataLine phat du lieu theo clock cua thiet bi.
                 RTPPacket packet = jitterBuffer.getNextPacket();
                 if (packet != null && packet.getPayload() != null) {
                     byte[] audioData = packet.getPayload();
@@ -277,15 +278,15 @@ public class AudioPlayback implements Runnable {
                         }
                     }
                 } else {
-                    // Nếu buffer trống (underrun), tạm nghỉ ngắn để tránh chiếm CPU
+                    // Neu buffer trong (underrun), tam nghi ngan de tranh chiem CPU
                     Thread.sleep(5);
                 }
             }
         } catch (InterruptedException e) {
-            // Luồng bị ngắt khi dừng
+            // Luong bi ngat khi dung
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Lỗi trong luồng phát âm thanh", e);
+            LOGGER.log(Level.SEVERE, "Loi trong luong phat am thanh", e);
         }
     }
 

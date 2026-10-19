@@ -22,11 +22,12 @@ public class HomeForm extends javax.swing.JFrame {
         txtServerPort.setText(Integer.toString(AudioConstants.DEFAULT_UDP_PORT));
     }
     private boolean validateConnectionSettings() {
+    // Kiem tra du lieu truoc khi chuyen sang man hinh client de tranh loi parse/khoi tao.
     if (!validateServerPort()) {
         return false;
     }
     if (txtServerIP.getText().trim().isEmpty()) {
-        javax.swing.JOptionPane.showMessageDialog(this, "Vui lòng nhập IP Server.");
+        javax.swing.JOptionPane.showMessageDialog(this, "Vui long nhap IP Server.");
         txtServerIP.requestFocus();
         return false;
     }
@@ -40,13 +41,13 @@ public class HomeForm extends javax.swing.JFrame {
 
         if (serverPort < 1 || serverPort > 65535) {
             javax.swing.JOptionPane.showMessageDialog(
-                    this, "Cổng phải nằm trong khoảng 1–65535.");
+                    this, "Cong phai nam trong khoang 1-65535.");
             return false;
         }
 
     } catch (NumberFormatException e) {
         javax.swing.JOptionPane.showMessageDialog(
-                this, "Cổng phải là số nguyên hợp lệ.");
+                this, "Cong phai la so nguyen hop le.");
         return false;
     }
     return true;
@@ -98,7 +99,7 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel2.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
         jLabel2.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel2.setText("Chọn vai trò và địa chỉ kết nối");
+        jLabel2.setText("Chon vai tro va dia chi ket noi");
 
         jLabel3.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel3.setForeground(new java.awt.Color(255, 255, 255));
@@ -106,7 +107,7 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel4.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel4.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel4.setText("Server / Phát");
+        jLabel4.setText("Server / Phat");
 
         javax.swing.GroupLayout pnlHeaderLayout = new javax.swing.GroupLayout(pnlHeader);
         pnlHeader.setLayout(pnlHeaderLayout);
@@ -155,15 +156,15 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel7.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel7.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel7.setText("NGHE ÂM THANH ");
+        jLabel7.setText("NGHE AM THANH ");
 
         jLabel8.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel8.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel8.setText("Client nhận luồng âm thanh");
+        jLabel8.setText("Client nhan luong am thanh");
 
         btnListen.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        btnListen.setText("BẮT ĐẦU NGHE");
-        btnListen.setActionCommand(" BẮT ĐẦU NGHE");
+        btnListen.setText("BAT DAU NGHE");
+        btnListen.setActionCommand(" BAT DAU NGHE");
         btnListen.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnListenActionPerformed(evt);
@@ -171,7 +172,7 @@ public class HomeForm extends javax.swing.JFrame {
         });
 
         jLabel9.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel9.setText("🎧");
+        jLabel9.setText("AUDIO");
 
         javax.swing.GroupLayout lblListenIconLayout = new javax.swing.GroupLayout(lblListenIcon);
         lblListenIcon.setLayout(lblListenIconLayout);
@@ -213,14 +214,14 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel5.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel5.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel5.setText("PHÁT ÂM THANH");
+        jLabel5.setText("PHAT AM THANH");
 
         jLabel6.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel6.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel6.setText("Server gửi đến nhiều người");
+        jLabel6.setText("Server gui den nhieu nguoi");
 
         btnBroadcast.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        btnBroadcast.setText("BẮT ĐẦU PHÁT");
+        btnBroadcast.setText("BAT DAU PHAT");
         btnBroadcast.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnBroadcastActionPerformed(evt);
@@ -228,7 +229,7 @@ public class HomeForm extends javax.swing.JFrame {
         });
 
         jLabel11.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel11.setText("🎧");
+        jLabel11.setText("AUDIO");
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
         jPanel2.setLayout(jPanel2Layout);
@@ -288,7 +289,7 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel10.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel10.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel10.setText("CẤU HÌNH KẾT NỐI");
+        jLabel10.setText("CAU HINH KET NOI");
 
         jLabel12.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel12.setForeground(new java.awt.Color(255, 255, 255));
@@ -296,10 +297,10 @@ public class HomeForm extends javax.swing.JFrame {
 
         jLabel14.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel14.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel14.setText("Cổng Server");
+        jLabel14.setText("Cong Server");
 
         btnExit.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        btnExit.setText("Thoát");
+        btnExit.setText("Thoat");
         btnExit.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnExitActionPerformed(evt);
@@ -380,6 +381,7 @@ public class HomeForm extends javax.swing.JFrame {
             return;
         }
         int port = Integer.parseInt(txtServerPort.getText().trim());
+        // An man hinh chinh nhung giu no de hien lai khi cua so server dong.
         ServerForm serverForm = new ServerForm(port);
         serverForm.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -399,6 +401,7 @@ public class HomeForm extends javax.swing.JFrame {
         String host = txtServerIP.getText().trim();
         int port = Integer.parseInt(txtServerPort.getText().trim());
         try {
+            // Khoi tao client co the mo thiet bi am thanh hoac socket nen can bao loi cho nguoi dung.
             ListenForm listenForm = new ListenForm(host, port);
             listenForm.addWindowListener(new java.awt.event.WindowAdapter() {
                 @Override
@@ -411,8 +414,8 @@ public class HomeForm extends javax.swing.JFrame {
             listenForm.setVisible(true);
         } catch (java.io.IOException | javax.sound.sampled.LineUnavailableException e) {
             javax.swing.JOptionPane.showMessageDialog(this,
-                    "Không thể kết nối/phát âm thanh: " + e.getMessage(),
-                    "Lỗi kết nối", javax.swing.JOptionPane.ERROR_MESSAGE);
+                    "Khong the ket noi/phat am thanh: " + e.getMessage(),
+                    "Loi ket noi", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_btnListenActionPerformed
 
@@ -420,8 +423,8 @@ public class HomeForm extends javax.swing.JFrame {
         // TODO add your handling code here:
         int result = javax.swing.JOptionPane.showConfirmDialog(
                 this,
-                "Bạn có muốn thoát ứng dụng không?",
-                "Xác nhận thoát",
+                "Ban co muon thoat ung dung khong?",
+                "Xac nhan thoat",
                 javax.swing.JOptionPane.YES_NO_OPTION
         );
 

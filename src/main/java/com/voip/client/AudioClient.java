@@ -50,20 +50,20 @@ public class AudioClient implements Runnable {
     private volatile int previousTimestamp;
     private volatile long lastServerResponseTime;
     private volatile long currentSsrc = -1;
-    private volatile String connectionMessage = "Đang chờ phản hồi từ server.";
+    private volatile String connectionMessage = "Dang cho phan hoi tu server.";
     private volatile int lastSequenceNumber = -1;
 
     public AudioClient(String host, int serverPort, JitterBuffer jitterBuffer,
                        AudioPlayback audioPlayback) throws IOException {
         if (serverPort < 1 || serverPort > 65535) {
-            throw new IllegalArgumentException("Cổng server phải từ 1 đến 65535.");
+            throw new IllegalArgumentException("Cong server phai tu 1 den 65535.");
         }
         serverAddress = new InetSocketAddress(InetAddress.getByName(host), serverPort);
         this.jitterBuffer = jitterBuffer;
         this.audioPlayback = audioPlayback;
         codec = System.getProperty(AudioConstants.CODEC_PROPERTY, "pcm").trim().toLowerCase();
         if (!codec.equals("pcm") && !codec.equals("ulaw")) {
-            throw new IllegalArgumentException("Codec không hỗ trợ: " + codec);
+            throw new IllegalArgumentException("Codec khong ho tro: " + codec);
         }
         payloadType = codec.equals("ulaw")
                 ? RTPPacket.PAYLOAD_TYPE_ULAW : RTPPacket.PAYLOAD_TYPE_PCM;
@@ -71,7 +71,7 @@ public class AudioClient implements Runnable {
         try {
             audioCrypto = new AudioCrypto(passphrase);
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Không thể khởi tạo bảo vệ âm thanh.", e);
+            throw new IllegalStateException("Khong the khoi tao bao ve am thanh.", e);
         }
     }
 
@@ -94,7 +94,8 @@ public class AudioClient implements Runnable {
             socket = clientSocket;
             lastServerResponseTime = 0;
             connectionAccepted = false;
-            connectionMessage = "Đang thương lượng cấu hình với server.";
+            connectionMessage = "Dang thuong luong cau hinh voi server.";
+            // JOIN thuong luong codec va co ma hoa truoc khi client nhan media.
             running = true;
             sendControl(ControlMessage.join(payloadType, audioCrypto.isEnabled()));
             heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(task -> {
@@ -129,7 +130,7 @@ public class AudioClient implements Runnable {
         try {
             sendControl(ControlMessage.leave());
         } catch (IOException e) {
-            LOGGER.log(Level.FINE, "Không gửi được lệnh LEAVE.", e);
+            LOGGER.log(Level.FINE, "Khong gui duoc lenh LEAVE.", e);
         }
         running = false;
         connectionAccepted = false;
@@ -158,7 +159,7 @@ public class AudioClient implements Runnable {
     private void sendControl(ControlMessage control) throws IOException {
         DatagramSocket currentSocket = socket;
         if (currentSocket == null || currentSocket.isClosed()) {
-            throw new SocketException("Client UDP chưa được khởi động.");
+            throw new SocketException("Client UDP chua duoc khoi dong.");
         }
         byte[] bytes = control.encode();
         currentSocket.send(new DatagramPacket(bytes, bytes.length, serverAddress));
@@ -172,15 +173,16 @@ public class AudioClient implements Runnable {
             long lastResponse = lastServerResponseTime;
             if (connectionAccepted && lastResponse > 0
                     && System.currentTimeMillis() - lastResponse < 15_000) {
+                // Token la thoi diem gui, dung de uoc tinh RTT khi PONG quay lai.
                 sendControl(ControlMessage.ping(System.nanoTime()));
             } else {
                 connectionAccepted = false;
-                connectionMessage = "Đang kết nối lại với server.";
+                connectionMessage = "Dang ket noi lai voi server.";
                 sendControl(ControlMessage.join(payloadType, audioCrypto.isEnabled()));
             }
         } catch (IOException e) {
             if (running) {
-                LOGGER.log(Level.WARNING, "Không thể gửi heartbeat tới server.", e);
+                LOGGER.log(Level.WARNING, "Khong the gui heartbeat toi server.", e);
             }
         }
     }
@@ -214,6 +216,7 @@ public class AudioClient implements Runnable {
                     processControl(control);
                     continue;
                 }
+                // Bo goi media den tu endpoint khac hoac truoc khi server chap nhan JOIN.
                 RTPPacket packet = RTPPacket.decode(datagram.getData(), datagram.getLength());
                 if (packet == null || !connectionAccepted || packet.getPayloadType() != payloadType) {
                     continue;
@@ -225,12 +228,12 @@ public class AudioClient implements Runnable {
                 }
             } catch (SocketException e) {
                 if (running) {
-                    LOGGER.log(Level.SEVERE, "Socket client gặp lỗi.", e);
+                    LOGGER.log(Level.SEVERE, "Socket client gap loi.", e);
                 }
                 break;
             } catch (IOException | GeneralSecurityException e) {
                 if (running) {
-                    LOGGER.log(Level.SEVERE, "Không thể nhận/giải mã gói âm thanh.", e);
+                    LOGGER.log(Level.SEVERE, "Khong the nhan/giai ma goi am thanh.", e);
                 }
             }
         }
@@ -243,10 +246,10 @@ public class AudioClient implements Runnable {
                 if (control.getPayloadType() == payloadType
                         && control.isEncrypted() == audioCrypto.isEnabled()) {
                     connectionAccepted = true;
-                    connectionMessage = "Đã kết nối";
+                    connectionMessage = "Da ket noi";
                 } else {
                     connectionAccepted = false;
-                    connectionMessage = "Server phản hồi cấu hình không khớp.";
+                    connectionMessage = "Server phan hoi cau hinh khong khop.";
                 }
             }
             case ControlMessage.REJECT -> {
@@ -261,13 +264,14 @@ public class AudioClient implements Runnable {
                     rttSamples.incrementAndGet();
                 }
             }
-            default -> LOGGER.fine("Bỏ qua lệnh điều khiển không mong đợi.");
+            default -> LOGGER.fine("Bo qua lenh dieu khien khong mong doi.");
         }
     }
 
     private void processPacket(RTPPacket packet, int wireLength) throws GeneralSecurityException {
         byte[] payload;
         try {
+            // AAD buoc header RTP khong bi sua ma khong bi AES-GCM phat hien.
             payload = audioCrypto.decrypt(packet.getPayload(), packet.getHeaderBytes());
         } catch (AEADBadTagException e) {
             authenticationFailures.incrementAndGet();
@@ -280,6 +284,7 @@ public class AudioClient implements Runnable {
         }
         lastServerResponseTime = System.currentTimeMillis();
         if (currentSsrc != packet.getSsrc()) {
+            // Nguon moi co sequence space rieng, nen xoa trang thai thong ke va buffer cu.
             currentSsrc = packet.getSsrc();
             sequenceTracker.reset();
             if (jitterBuffer != null) {
@@ -305,6 +310,7 @@ public class AudioClient implements Runnable {
         if (payloadType == RTPPacket.PAYLOAD_TYPE_ULAW) {
             payload = G711Codec.decode(payload);
         }
+        // JitterBuffer nhan PCM da giai ma de co the phat truc tiep ra SourceDataLine.
         if (jitterBuffer != null) {
             jitterBuffer.addPacket(new RTPPacket(payloadType, packet.getSequence(),
                     packet.getTimestamp(), packet.getSsrc(), payload));
@@ -398,6 +404,7 @@ public class AudioClient implements Runnable {
             int difference = (short) ((sequence - (highestExtended & 0xFFFF)) & 0xFFFF);
             long candidate = highestExtended + difference;
             if (difference > 0) {
+                // Goi nhay ve truoc tao cac sequence con thieu; goi den muon co the lap cho trong.
                 for (long missing = highestExtended + 1; missing < candidate; missing++) {
                     missingPackets.add(missing);
                 }
@@ -421,6 +428,7 @@ public class AudioClient implements Runnable {
         private void expireOldPackets() {
             long oldestRetained = highestExtended - SEQUENCE_WINDOW;
             receivedPackets.removeIf(sequence -> sequence < oldestRetained);
+            // Goi thieu qua xa cua so theo doi duoc chot la mat de gioi han bo nho.
             missingPackets.removeIf(sequence -> {
                 if (sequence < oldestRetained) {
                     finalizedLost++;

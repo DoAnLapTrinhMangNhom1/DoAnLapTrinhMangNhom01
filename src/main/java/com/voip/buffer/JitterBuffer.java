@@ -41,6 +41,7 @@ public class JitterBuffer {
             if (nextSequence == -1) {
                 nextSequence = sequence;
             } else {
+                // Hieu so kieu signed 16-bit giup so sanh dung ca khi sequence quay vong tu 65535 ve 0.
                 int distance = sequenceDifference(sequence, nextSequence);
                 if (packets.containsKey(sequence)) {
                     return;
@@ -76,6 +77,7 @@ public class JitterBuffer {
                     packetAvailable.await();
                     continue;
                 }
+                // Chi bat dau phat sau khi da tich luy du so frame cau hinh.
                 if (!started) {
                     started = true;
                 }
@@ -87,6 +89,7 @@ public class JitterBuffer {
 
                 int closestSequence = findClosestFutureSequence();
                 if (closestSequence >= 0) {
+                    // Cho ngan de cho goi den lech thu tu co hoi toi truoc khi xem la mat.
                     long remaining = REORDER_GRACE_NANOS;
                     while (packets.get(nextSequence) == null && remaining > 0) {
                         remaining = packetAvailable.awaitNanos(remaining);
@@ -102,6 +105,7 @@ public class JitterBuffer {
                 closestSequence = findClosestFutureSequence();
                 if (closestSequence >= 0
                         && sequenceDifference(closestSequence, playedSequence) > capacity * 2) {
+                    // Neu luong da troi qua xa, bo khoang trong thay vi phat tre toan bo phien.
                     packet = packets.remove(closestSequence);
                     nextSequence = (closestSequence + 1) & 0xFFFF;
                     return acceptPacket(packet);
@@ -136,7 +140,7 @@ public class JitterBuffer {
     public void setBufferSizeMs(int bufferSizeMs) {
         if (bufferSizeMs < AudioConstants.FRAME_MS
                 || bufferSizeMs > 500) {
-            throw new IllegalArgumentException("Jitter buffer phải từ 20 ms đến 500 ms.");
+            throw new IllegalArgumentException("Jitter buffer phai tu 20 ms den 500 ms.");
         }
         lock.lock();
         try {
@@ -149,6 +153,7 @@ public class JitterBuffer {
                 consecutiveLosses = 0;
             }
             this.bufferSizeMs = bufferSizeMs;
+            // Lam tron len so frame nguyen vi moi packet luon dai FRAME_MS.
             capacity = Math.max(1, (bufferSizeMs + AudioConstants.FRAME_MS - 1)
                     / AudioConstants.FRAME_MS);
             while (packets.size() > capacity) {
@@ -217,6 +222,7 @@ public class JitterBuffer {
 
     private byte[] concealLastFrame() {
         consecutiveLosses++;
+        // Che giau mot so frame mat bang am thanh nho dan, sau do phat im lang.
         if (lastPayload == null || lastPayload.length != payloadSize || consecutiveLosses > 4) {
             return new byte[payloadSize];
         }

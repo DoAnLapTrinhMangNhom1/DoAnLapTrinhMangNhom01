@@ -46,6 +46,7 @@ public class ListenForm extends javax.swing.JFrame {
         initializeControls();
         initializeSpeakerComboBox();
         startDeviceCheckTimer();
+        // Cac doi tuong nay phoi hop nhan goi, dem jitter va phat am thanh.
         jitterBuffer = new JitterBuffer(AudioConstants.JITTER_BUFFER_MS);
         lblJitterBuffer.setText("Jitter Buffer: " + jitterBuffer.getBufferSizeMs() + " ms");
         audioPlayback = new AudioPlayback(jitterBuffer);
@@ -53,17 +54,17 @@ public class ListenForm extends javax.swing.JFrame {
         audioClient = new AudioClient(host, port, jitterBuffer, audioPlayback);
         audioClient.startClient();
         audioPlayback.setVolumePercent(sliderVolume.getValue());
-        jLabel5.setText("Đang kết nối...");
+        jLabel5.setText("Dang ket noi...");
         jLabel6.setText("Server: " + host + ":" + port);
         jLabel7.setText("Client UDP: " + audioClient.getPort());
-        txtLog.append("Đã kết nối tới " + host + ":" + port + "\n");
+        txtLog.append("Da ket noi toi " + host + ":" + port + "\n");
         statsTimer.start();
     }
 
     private void initializeControls() {
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-        jLabel5.setText("Chưa kết nối");
-        jLabel3.setText("NGHE ÂM THANH TRỰC TIẾP");
+        jLabel5.setText("Chua ket noi");
+        jLabel3.setText("NGHE AM THANH TRUC TIEP");
 
         sliderVolume.setValue(100);
         cboJitterBuffer.setSelectedItem(AudioConstants.JITTER_BUFFER_MS + "ms");
@@ -71,13 +72,14 @@ public class ListenForm extends javax.swing.JFrame {
             if (jitterBuffer != null) {
                 String choice = (String) cboJitterBuffer.getSelectedItem();
                 try {
+                    // Thay muc dem se xoa hang doi cu va tich luy lai theo cau hinh moi.
                     jitterBuffer.setBufferSizeMs(Integer.parseInt(choice.replace("ms", "")));
-                    txtLog.append("Jitter Buffer đặt thành " + jitterBuffer.getBufferSizeMs()
-                            + " ms; đang tích lũy lại trước khi phát.\n");
+                    txtLog.append("Jitter Buffer dat thanh " + jitterBuffer.getBufferSizeMs()
+                            + " ms; dang tich luy lai truoc khi phat.\n");
                     refreshStats();
                 } catch (IllegalArgumentException e) {
                     javax.swing.JOptionPane.showMessageDialog(this,
-                            "Kích thước Jitter Buffer không hợp lệ.", "Lỗi",
+                            "Kich thuoc Jitter Buffer khong hop le.", "Loi",
                             javax.swing.JOptionPane.ERROR_MESSAGE);
                 }
             }
@@ -93,12 +95,13 @@ public class ListenForm extends javax.swing.JFrame {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent event) {
+                // Giai phong socket, luong phat va timer khi dong cua so client.
                 stopClient();
                 stopDeviceCheckTimer();
             }
         });
         statsTimer = new Timer(500, event -> refreshStats());
-        btnPlayPause.setText("Tạm dừng");
+        btnPlayPause.setText("Tam dung");
     }
 
     private void initializeSpeakerComboBox() {
@@ -131,13 +134,14 @@ public class ListenForm extends javax.swing.JFrame {
 
                 if (audioPlayback != null && audioPlayback.isPlaying()) {
                     try {
+                        // Doi thiet bi khi dang nghe can khoi tao lai line phat.
                         audioPlayback.setSpeaker(selected);
                         audioPlayback.restartPlayback();
-                        txtLog.append("Đã đổi sang: " + selected.getName() + "\n");
+                        txtLog.append("Da doi sang: " + selected.getName() + "\n");
                     } catch (LineUnavailableException ex) {
                         javax.swing.JOptionPane.showMessageDialog(this,
-                            "Không thể đổi loa: " + ex.getMessage(),
-                            "Lỗi", javax.swing.JOptionPane.ERROR_MESSAGE);
+                            "Khong the doi loa: " + ex.getMessage(),
+                            "Loi", javax.swing.JOptionPane.ERROR_MESSAGE);
                     }
                 } else {
                     if (audioPlayback != null) {
@@ -153,16 +157,16 @@ public class ListenForm extends javax.swing.JFrame {
             audioPlayback.setDeviceChangeListener(new AudioPlayback.DeviceChangeListener() {
                 @Override
                 public void onDeviceRemoved(Mixer.Info oldDevice) {
-                    txtLog.append("Thiết bị " + (oldDevice != null ? oldDevice.getName() : "default")
-                        + " bị rút, đang chuyển sang default\n");
+                    txtLog.append("Thiet bi " + (oldDevice != null ? oldDevice.getName() : "default")
+                        + " bi rut, dang chuyen sang default\n");
                     refreshSpeakerComboBox();
 
                     if (audioPlayback.isPlaying()) {
                         try {
-                            jitterBuffer.clear(); // Clear jitter buffer trước khi restart
+                            jitterBuffer.clear(); // Clear jitter buffer truoc khi restart
                             audioPlayback.restartPlayback();
                         } catch (LineUnavailableException ex) {
-                            txtLog.append("Lỗi khi restart: " + ex.getMessage() + "\n");
+                            txtLog.append("Loi khi restart: " + ex.getMessage() + "\n");
                         }
                     }
                 }
@@ -170,7 +174,7 @@ public class ListenForm extends javax.swing.JFrame {
                 @Override
                 public void onDeviceAdded(List<Mixer.Info> newDevices) {
                     for (Mixer.Info device : newDevices) {
-                        txtLog.append("Phát hiện thiết bị mới: " + device.getName() + "\n");
+                        txtLog.append("Phat hien thiet bi moi: " + device.getName() + "\n");
                     }
                     refreshSpeakerComboBox();
                 }
@@ -218,6 +222,7 @@ public class ListenForm extends javax.swing.JFrame {
     }
 
     private void startDeviceCheckTimer() {
+        // Swing Timer kiem tra thiet bi dinh ky tren Event Dispatch Thread.
         deviceCheckTimer = new Timer(1000, e -> {
             if (audioPlayback != null) {
                 audioPlayback.checkForDeviceChanges();
@@ -296,7 +301,7 @@ public class ListenForm extends javax.swing.JFrame {
         );
 
         jLabel20.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel20.setText("Tỷ lệ mất gói");
+        jLabel20.setText("Ty le mat goi");
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setResizable(false);
@@ -332,11 +337,11 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel3.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel3.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel3.setText("ĐIỀU KHIỂN PHÁT ÂM THANH");
+        jLabel3.setText("DIEU KHIEN PHAT AM THANH");
 
         jLabel9.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel9.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel9.setText("Thiết bị đầu ra");
+        jLabel9.setText("Thiet bi dau ra");
 
         cboOutputDevice.setBackground(new java.awt.Color(0, 102, 153));
         cboOutputDevice.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
@@ -344,7 +349,7 @@ public class ListenForm extends javax.swing.JFrame {
         cboOutputDevice.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Live Streaming (UDP)" }));
 
         btnPlayPause.setBackground(new java.awt.Color(0, 102, 255));
-        btnPlayPause.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        btnPlayPause.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         btnPlayPause.setForeground(new java.awt.Color(255, 255, 255));
         btnPlayPause.setText("Play");
         btnPlayPause.addActionListener(new java.awt.event.ActionListener() {
@@ -358,7 +363,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel5.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel5.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel5.setText("Đã kết nối");
+        jLabel5.setText("Da ket noi");
 
         jLabel6.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel6.setForeground(new java.awt.Color(255, 255, 255));
@@ -435,15 +440,15 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel13.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel13.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel13.setText("Thống kê mạng");
+        jLabel13.setText("Thong ke mang");
 
         jLabel23.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel23.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel23.setText("Cấu hình Jittter Buffer");
+        jLabel23.setText("Cau hinh Jittter Buffer");
 
         jLabel31.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel31.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel31.setText("Mức đệm");
+        jLabel31.setText("Muc dem");
 
         cboJitterBuffer.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "50ms", "75ms", "100ms", "200ms", "300ms", "400ms", "500ms" }));
         cboJitterBuffer.addActionListener(new java.awt.event.ActionListener() {
@@ -458,7 +463,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         btnResetStats.setBackground(new java.awt.Color(0, 51, 255));
         btnResetStats.setForeground(new java.awt.Color(255, 255, 255));
-        btnResetStats.setText("Đặt lại thống kê");
+        btnResetStats.setText("Dat lai thong ke");
         btnResetStats.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnResetStatsActionPerformed(evt);
@@ -467,7 +472,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel11.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel11.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel11.setText("Nhật ký hoạt động");
+        jLabel11.setText("Nhat ky hoat dong");
 
         txtLog.setEditable(false);
         txtLog.setColumns(20);
@@ -479,14 +484,14 @@ public class ListenForm extends javax.swing.JFrame {
         lblPacketsReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsReceived.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketsReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblPacketsReceived.setText("Gói nhận: 0");
+        lblPacketsReceived.setText("Goi nhan: 0");
         lblPacketsReceived.setToolTipText("");
         lblPacketsReceived.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(0, 204, 255)));
 
         lblPacketsLost.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsLost.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketsLost.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblPacketsLost.setText("Gói mất: 0");
+        lblPacketsLost.setText("Goi mat: 0");
         lblPacketsLost.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(0, 204, 255)));
 
         lblJitter.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
@@ -498,19 +503,19 @@ public class ListenForm extends javax.swing.JFrame {
         lblLatency.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblLatency.setForeground(new java.awt.Color(255, 255, 255));
         lblLatency.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
+        lblLatency.setText("Uoc tinh mang (RTT/2): -- ms");
         lblLatency.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(0, 204, 255)));
 
         lblBytesReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblBytesReceived.setForeground(new java.awt.Color(255, 255, 255));
         lblBytesReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblBytesReceived.setText("Dung lượng: 0kb");
+        lblBytesReceived.setText("Dung luong: 0kb");
         lblBytesReceived.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(0, 204, 255)));
 
         lblPacketLossRate.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketLossRate.setForeground(new java.awt.Color(255, 255, 255));
         lblPacketLossRate.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblPacketLossRate.setText("Tỷ lệ mất gói: 0.00%");
+        lblPacketLossRate.setText("Ty le mat goi: 0.00%");
         lblPacketLossRate.setBorder(javax.swing.BorderFactory.createMatteBorder(1, 1, 1, 1, new java.awt.Color(0, 204, 255)));
 
         javax.swing.GroupLayout jPanel6Layout = new javax.swing.GroupLayout(jPanel6);
@@ -588,7 +593,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel16.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel16.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel16.setText("Âm lượng");
+        jLabel16.setText("Am luong");
 
         sliderVolume.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         sliderVolume.addChangeListener(new javax.swing.event.ChangeListener() {
@@ -613,7 +618,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         jLabel18.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel18.setForeground(new java.awt.Color(255, 255, 255));
-        jLabel18.setText("Cường độ âm thanh (Input level)");
+        jLabel18.setText("Cuong do am thanh (Input level)");
 
         btnVolumeUp.setBackground(new java.awt.Color(0, 51, 102));
         btnVolumeUp.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
@@ -630,19 +635,17 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel7Layout.setHorizontalGroup(
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel7Layout.createSequentialGroup()
+                .addGap(15, 15, 15)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel7Layout.createSequentialGroup()
-                        .addGap(30, 30, 30)
-                        .addComponent(btnVolumeDown, javax.swing.GroupLayout.PREFERRED_SIZE, 44, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(btnVolumeDown, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(sliderVolume, javax.swing.GroupLayout.PREFERRED_SIZE, 413, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(btnVolumeUp, javax.swing.GroupLayout.PREFERRED_SIZE, 41, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
+                        .addComponent(btnVolumeUp, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(lblVolumeValue, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(jPanel7Layout.createSequentialGroup()
-                        .addGap(15, 15, 15)
-                        .addComponent(jLabel16)))
+                    .addComponent(jLabel16))
                 .addGap(44, 44, 44)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 342, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -653,22 +656,22 @@ public class ListenForm extends javax.swing.JFrame {
             jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel7Layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel18)
-                    .addComponent(jLabel16))
-                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addGroup(jPanel7Layout.createSequentialGroup()
-                        .addGap(10, 10, 10)
-                        .addComponent(btnVolumeDown, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(jLabel16, javax.swing.GroupLayout.Alignment.TRAILING))
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel7Layout.createSequentialGroup()
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(lblVolumeValue)
                             .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(btnVolumeUp, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                            .addComponent(btnVolumeUp, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(jPanel7Layout.createSequentialGroup()
                         .addGap(18, 18, 18)
-                        .addComponent(sliderVolume, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addComponent(sliderVolume, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGap(10, 10, 10)
+                        .addComponent(btnVolumeDown, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(29, Short.MAX_VALUE))
         );
 
@@ -731,13 +734,13 @@ public class ListenForm extends javax.swing.JFrame {
         if (audioClient != null) {
             audioClient.resetStats();
         }
-        lblPacketsReceived.setText("Gói nhận: 0");
-        lblPacketsLost.setText("Gói mất: 0");
-        lblPacketLossRate.setText("Tỷ lệ mất gói: 0.00%");
-        lblLatency.setText("Mạng (RTT/2): -- ms");
+        lblPacketsReceived.setText("Goi nhan: 0");
+        lblPacketsLost.setText("Goi mat: 0");
+        lblPacketLossRate.setText("Ty le mat goi: 0.00%");
+        lblLatency.setText("Mang (RTT/2): -- ms");
         lblJitter.setText("Jitter: -- ms");
-        lblBytesReceived.setText("Dung lượng nhận: 0 KB");
-        txtLog.append("Đã yêu cầu đặt lại thống kê.\n");
+        lblBytesReceived.setText("Dung luong nhan: 0 KB");
+        txtLog.append("Da yeu cau dat lai thong ke.\n");
     }//GEN-LAST:event_btnResetStatsActionPerformed
 
     private void btnPlayPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPlayPauseActionPerformed
@@ -748,11 +751,11 @@ public class ListenForm extends javax.swing.JFrame {
         if (!isPlaying) {
             audioPlayback.resumePlayback();
             isPlaying = true;
-            btnPlayPause.setText("Tạm dừng");
+            btnPlayPause.setText("Tam dung");
         } else {
             audioPlayback.pausePlayback();
             isPlaying = false;
-            btnPlayPause.setText("Phát");
+            btnPlayPause.setText("Phat");
         }
     } catch (LineUnavailableException e) {
         showAudioError(e);
@@ -775,45 +778,46 @@ public class ListenForm extends javax.swing.JFrame {
         }
         int outputLevel = audioPlayback == null ? 0 : audioPlayback.getOutputLevelPercent();
         jProgressBar2.setValue(outputLevel);
-        jProgressBar2.setString("Âm thanh đang phát: " + outputLevel + "%");
+        jProgressBar2.setString("Am thanh dang phat: " + outputLevel + "%");
         if (audioClient.isConnectionAccepted() && audioClient.isServerReachable()) {
             long authenticationFailures = audioClient.getAuthenticationFailures();
-            jLabel5.setText(authenticationFailures == 0 ? "Đã kết nối"
-                    : "Đã kết nối • gói sai khóa: " + authenticationFailures);
+            jLabel5.setText(authenticationFailures == 0 ? "Da ket noi"
+                    : "Da ket noi - goi sai khoa: " + authenticationFailures);
         } else if (audioClient.isConnectionAccepted()) {
-            jLabel5.setText("Mất kết nối • đang chờ phản hồi");
+            jLabel5.setText("Mat ket noi - dang cho phan hoi");
         } else {
             jLabel5.setText(audioClient.getConnectionMessage());
         }
         jLabel5.setToolTipText(audioClient.getConnectionMessage());
-        lblPacketsReceived.setText("Gói nhận: " + audioClient.getPacketsReceived());
-        lblPacketsLost.setText("Gói mất: " + audioClient.getPacketsLost());
-        lblPacketLossRate.setText(String.format("Tỷ lệ mất gói: %.2f%%",
+        lblPacketsReceived.setText("Goi nhan: " + audioClient.getPacketsReceived());
+        lblPacketsLost.setText("Goi mat: " + audioClient.getPacketsLost());
+        lblPacketLossRate.setText(String.format("Ty le mat goi: %.2f%%",
                 audioClient.getPacketLossRate()));
         double oneWayEstimate = audioClient.getEstimatedOneWayLatencyMs();
         if (Double.isNaN(oneWayEstimate)) {
-            lblLatency.setText("Mạng (RTT/2): -- ms");
+            lblLatency.setText("Mang (RTT/2): -- ms");
             lblJitter.setText(String.format("Jitter: %.2f ms", audioClient.getCurrentJitter()));
         } else {
+            // Day la uoc tinh RTT/2; cong frame va buffer chi de tham khao, khong phai do end-to-end.
             double effectiveBufferMs = jitterBuffer == null
                     ? 0 : jitterBuffer.getEffectiveBufferSizeMs();
             double bufferedEstimate = oneWayEstimate + AudioConstants.FRAME_MS + effectiveBufferMs;
-            lblLatency.setText(String.format("Mạng (RTT/2): %.1f ms", oneWayEstimate));
+            lblLatency.setText(String.format("Mang (RTT/2): %.1f ms", oneWayEstimate));
             lblLatency.setToolTipText(
-                    "Ước tính mạng từ một nửa RTT điều khiển; không phải latency end-to-end.");
+                    "Uoc tinh mang tu mot nua RTT dieu khien; khong phai latency end-to-end.");
             lblJitter.setText(String.format("Jitter %.2f ms",
                     audioClient.getCurrentJitter(), bufferedEstimate,
-                    bufferedEstimate >= 150 ? " (trên mục tiêu 150 ms)" : ""));
+                    bufferedEstimate >= 150 ? " (tren muc tieu 150 ms)" : ""));
         }
-        lblBytesReceived.setText(String.format("Dung lượng nhận: %d KB",
+        lblBytesReceived.setText(String.format("Dung luong nhan: %d KB",
                 audioClient.getKilobytesReceived()));
         if (jitterBuffer != null) {
-            lblJitterBuffer.setText("Buffer: " + jitterBuffer.getBufferSizeMs() + "→"
-                    + jitterBuffer.getEffectiveBufferSizeMs() + " ms • "
-                    + jitterBuffer.size() + " gói"
-                    + (jitterBuffer.isPlayingOut() ? " • đang phát" : " • đang tích lũy"));
+            lblJitterBuffer.setText("Buffer: " + jitterBuffer.getBufferSizeMs() + "->"
+                    + jitterBuffer.getEffectiveBufferSizeMs() + " ms - "
+                    + jitterBuffer.size() + " goi"
+                    + (jitterBuffer.isPlayingOut() ? " - dang phat" : " - dang tich luy"));
             lblJitterBuffer.setToolTipText(
-                    "Khi đổi mức, buffer xóa gói cũ và tích lũy theo mức mới trước khi phát lại.");
+                    "Khi doi muc, buffer xoa goi cu va tich luy theo muc moi truoc khi phat lai.");
         }
     }
 
@@ -831,7 +835,7 @@ public class ListenForm extends javax.swing.JFrame {
 
     private void showAudioError(Exception error) {
         javax.swing.JOptionPane.showMessageDialog(this, error.getMessage(),
-                "Không thể phát âm thanh", javax.swing.JOptionPane.ERROR_MESSAGE);
+                "Khong the phat am thanh", javax.swing.JOptionPane.ERROR_MESSAGE);
     }
 
     /**
