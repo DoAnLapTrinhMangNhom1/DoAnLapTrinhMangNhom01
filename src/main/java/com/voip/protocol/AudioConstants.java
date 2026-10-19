@@ -27,5 +27,5 @@ public final class AudioConstants {
     public static final int HISTORY_PACKET_COUNT = HISTORY_MS / FRAME_MS;
 
     private AudioConstants() {
-    }
+    }s
 }
