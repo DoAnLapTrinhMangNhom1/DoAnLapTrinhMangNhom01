@@ -6,7 +6,9 @@ import com.voip.client.AudioPlayback;
 import com.voip.protocol.AudioConstants;
 
 import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.Mixer;
 import java.io.IOException;
+import java.util.List;
 import javax.swing.Timer;
 
 /*
@@ -29,18 +31,25 @@ public class ListenForm extends javax.swing.JFrame {
     private AudioPlayback audioPlayback;
     private JitterBuffer jitterBuffer;
     private Timer statsTimer;
+    private Timer deviceCheckTimer;
+    private List<Mixer.Info> availableSpeakers;
 
     public ListenForm() {
         initComponents();
         initializeControls();
+        initializeSpeakerComboBox();
+        startDeviceCheckTimer();
     }
 
     public ListenForm(String host, int port) throws IOException, LineUnavailableException {
         initComponents();
         initializeControls();
+        initializeSpeakerComboBox();
+        startDeviceCheckTimer();
         jitterBuffer = new JitterBuffer(AudioConstants.JITTER_BUFFER_MS);
         lblJitterBuffer.setText("Jitter Buffer: " + jitterBuffer.getBufferSizeMs() + " ms");
         audioPlayback = new AudioPlayback(jitterBuffer);
+        setupDeviceChangeListener();
         audioClient = new AudioClient(host, port, jitterBuffer, audioPlayback);
         audioClient.startClient();
         audioPlayback.setVolumePercent(sliderVolume.getValue());
@@ -83,10 +92,147 @@ public class ListenForm extends javax.swing.JFrame {
             @Override
             public void windowClosed(java.awt.event.WindowEvent event) {
                 stopClient();
+                stopDeviceCheckTimer();
             }
         });
         statsTimer = new Timer(500, event -> refreshStats());
         btnPlayPause.setText("Tạm dừng");
+    }
+
+    private void initializeSpeakerComboBox() {
+        availableSpeakers = AudioPlayback.getAvailableSpeakers();
+        cboOutputDevice.removeAllItems();
+
+        for (Mixer.Info speaker : availableSpeakers) {
+            cboOutputDevice.addItem(speaker.getName());
+        }
+
+        int defaultIndex = -1;
+        for (int i = 0; i < availableSpeakers.size(); i++) {
+            String name = availableSpeakers.get(i).getName().toLowerCase();
+            if (name.contains("default") || name.contains("primary")) {
+                defaultIndex = i;
+                break;
+            }
+        }
+
+        if (defaultIndex >= 0) {
+            cboOutputDevice.setSelectedIndex(defaultIndex);
+        } else if (!availableSpeakers.isEmpty()) {
+            cboOutputDevice.setSelectedIndex(0);
+        }
+
+        cboOutputDevice.addActionListener(e -> {
+            int selectedIndex = cboOutputDevice.getSelectedIndex();
+            if (selectedIndex >= 0 && selectedIndex < availableSpeakers.size()) {
+                Mixer.Info selected = availableSpeakers.get(selectedIndex);
+
+                if (audioPlayback != null && audioPlayback.isPlaying()) {
+                    try {
+                        audioPlayback.setSpeaker(selected);
+                        audioPlayback.restartPlayback();
+                        txtLog.append("Đã đổi sang: " + selected.getName() + "\n");
+                    } catch (LineUnavailableException ex) {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Không thể đổi loa: " + ex.getMessage(),
+                            "Lỗi", javax.swing.JOptionPane.ERROR_MESSAGE);
+                    }
+                } else {
+                    if (audioPlayback != null) {
+                        audioPlayback.setSpeaker(selected);
+                    }
+                }
+            }
+        });
+    }
+
+    private void setupDeviceChangeListener() {
+        if (audioPlayback != null) {
+            audioPlayback.setDeviceChangeListener(new AudioPlayback.DeviceChangeListener() {
+                @Override
+                public void onDeviceRemoved(Mixer.Info oldDevice) {
+                    txtLog.append("Thiết bị " + (oldDevice != null ? oldDevice.getName() : "default")
+                        + " bị rút, đang chuyển sang default\n");
+                    refreshSpeakerComboBox();
+
+                    if (audioPlayback.isPlaying()) {
+                        try {
+                            jitterBuffer.clear(); // Clear jitter buffer trước khi restart
+                            audioPlayback.restartPlayback();
+                        } catch (LineUnavailableException ex) {
+                            txtLog.append("Lỗi khi restart: " + ex.getMessage() + "\n");
+                        }
+                    }
+                }
+
+                @Override
+                public void onDeviceAdded(List<Mixer.Info> newDevices) {
+                    for (Mixer.Info device : newDevices) {
+                        txtLog.append("Phát hiện thiết bị mới: " + device.getName() + "\n");
+                    }
+                    refreshSpeakerComboBox();
+                }
+            });
+        }
+    }
+
+    private void refreshSpeakerComboBox() {
+        Mixer.Info currentSelection = audioPlayback.getSelectedSpeaker();
+        int currentIndex = -1;
+
+        if (currentSelection != null) {
+            currentIndex = availableSpeakers.indexOf(currentSelection);
+        }
+
+        availableSpeakers = AudioPlayback.getAvailableSpeakers();
+        String selectedItem = cboOutputDevice.getSelectedItem() != null
+            ? cboOutputDevice.getSelectedItem().toString()
+            : "";
+
+        cboOutputDevice.removeAllItems();
+        for (Mixer.Info speaker : availableSpeakers) {
+            cboOutputDevice.addItem(speaker.getName());
+        }
+
+        if (currentSelection != null && availableSpeakers.contains(currentSelection)) {
+            int newIndex = availableSpeakers.indexOf(currentSelection);
+            cboOutputDevice.setSelectedIndex(newIndex);
+        } else {
+            int defaultIndex = -1;
+            for (int i = 0; i < availableSpeakers.size(); i++) {
+                String name = availableSpeakers.get(i).getName().toLowerCase();
+                if (name.contains("default") || name.contains("primary")) {
+                    defaultIndex = i;
+                    break;
+                }
+            }
+
+            if (defaultIndex >= 0) {
+                cboOutputDevice.setSelectedIndex(defaultIndex);
+            } else if (!availableSpeakers.isEmpty()) {
+                cboOutputDevice.setSelectedIndex(0);
+            }
+        }
+    }
+
+    private void startDeviceCheckTimer() {
+        deviceCheckTimer = new Timer(1000, e -> {
+            if (audioPlayback != null) {
+                audioPlayback.checkForDeviceChanges();
+
+                if (!audioPlayback.isCurrentDeviceAvailable()) {
+                    audioPlayback.autoSwitchToDefault();
+                }
+            }
+        });
+        deviceCheckTimer.start();
+    }
+
+    private void stopDeviceCheckTimer() {
+        if (deviceCheckTimer != null) {
+            deviceCheckTimer.stop();
+            deviceCheckTimer = null;
+        }
     }
 
     /**
@@ -113,7 +259,7 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         jLabel9 = new javax.swing.JLabel();
-        jComboBox1 = new javax.swing.JComboBox<>();
+        cboOutputDevice = new javax.swing.JComboBox<>();
         btnPlayPause = new javax.swing.JButton();
         jPanel6 = new javax.swing.JPanel();
         jLabel13 = new javax.swing.JLabel();
@@ -142,6 +288,7 @@ public class ListenForm extends javax.swing.JFrame {
         sliderVolume = new javax.swing.JSlider();
         btnVolumeDown = new javax.swing.JButton();
         lblVolumeValue = new javax.swing.JLabel();
+        lblVolumeValue = new javax.swing.JLabel();
         jProgressBar2 = new javax.swing.JProgressBar();
         jLabel18 = new javax.swing.JLabel();
         btnVolumeUp = new javax.swing.JButton();
@@ -162,10 +309,12 @@ public class ListenForm extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setResizable(false);
+        setResizable(false);
 
         jPanel1.setBackground(new java.awt.Color(0, 0, 102));
 
         jPanel2.setBackground(new java.awt.Color(0, 51, 102));
+        jPanel2.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
         jPanel2.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
 
         jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 20)); // NOI18N
@@ -268,6 +417,7 @@ public class ListenForm extends javax.swing.JFrame {
 
         jPanel3.setBackground(new java.awt.Color(0, 51, 102));
         jPanel3.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
+        jPanel3.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
 
         jLabel3.setFont(new java.awt.Font("Segoe UI", 1, 20)); // NOI18N
         jLabel3.setForeground(new java.awt.Color(255, 255, 255));
@@ -281,10 +431,10 @@ public class ListenForm extends javax.swing.JFrame {
         jLabel9.setForeground(new java.awt.Color(255, 255, 255));
         jLabel9.setText("Thiết bị đầu ra");
 
-        jComboBox1.setBackground(new java.awt.Color(0, 102, 153));
-        jComboBox1.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
-        jComboBox1.setForeground(new java.awt.Color(255, 255, 255));
-        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Live Streaming (UDP)" }));
+        cboOutputDevice.setBackground(new java.awt.Color(0, 102, 153));
+        cboOutputDevice.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
+        cboOutputDevice.setForeground(new java.awt.Color(255, 255, 255));
+        cboOutputDevice.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Live Streaming (UDP)" }));
 
         btnPlayPause.setBackground(new java.awt.Color(0, 102, 255));
         btnPlayPause.setFont(new java.awt.Font("Segoe UI", 1, 12)); // NOI18N
@@ -306,13 +456,16 @@ public class ListenForm extends javax.swing.JFrame {
                         .addGap(14, 14, 14)
                         .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel3)
+                            .addComponent(jLabel3)
                             .addComponent(jLabel4))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel9)
-                            .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 309, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                            .addComponent(cboOutputDevice, javax.swing.GroupLayout.PREFERRED_SIZE, 309, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(jPanel3Layout.createSequentialGroup()
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(btnPlayPause, javax.swing.GroupLayout.PREFERRED_SIZE, 103, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(556, 556, 556)))
                         .addComponent(btnPlayPause, javax.swing.GroupLayout.PREFERRED_SIZE, 103, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(556, 556, 556)))
                 .addGap(339, 339, 339))
@@ -327,13 +480,15 @@ public class ListenForm extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel4)
-                    .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(cboOutputDevice, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(18, 18, 18)
                 .addComponent(btnPlayPause, javax.swing.GroupLayout.PREFERRED_SIZE, 39, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         jPanel6.setBackground(new java.awt.Color(0, 51, 102));
+        jPanel6.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
+        jPanel6.setForeground(new java.awt.Color(0, 51, 255));
         jPanel6.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
         jPanel6.setForeground(new java.awt.Color(0, 51, 255));
 
@@ -346,7 +501,9 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel14.setForeground(new java.awt.Color(0, 51, 102));
 
         lblPacketsLost.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblPacketsLost.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsLost.setForeground(new java.awt.Color(255, 255, 255));
+        lblPacketsLost.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketsLost.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketsLost.setText("Gói mất: 0");
 
@@ -357,9 +514,13 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel14Layout.createSequentialGroup()
                 .addComponent(lblPacketsLost, javax.swing.GroupLayout.PREFERRED_SIZE, 183, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+            .addGroup(jPanel14Layout.createSequentialGroup()
+                .addComponent(lblPacketsLost, javax.swing.GroupLayout.PREFERRED_SIZE, 183, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel14Layout.setVerticalGroup(
             jPanel14Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(lblPacketsLost, javax.swing.GroupLayout.DEFAULT_SIZE, 64, Short.MAX_VALUE)
             .addComponent(lblPacketsLost, javax.swing.GroupLayout.DEFAULT_SIZE, 64, Short.MAX_VALUE)
         );
 
@@ -368,7 +529,9 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel16.setForeground(new java.awt.Color(0, 51, 102));
 
         lblPacketsReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblPacketsReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketsReceived.setForeground(new java.awt.Color(255, 255, 255));
+        lblPacketsReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketsReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketsReceived.setText("Gói nhận: 0");
 
@@ -379,9 +542,12 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel16Layout.createSequentialGroup()
                 .addComponent(lblPacketsReceived, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+                .addComponent(lblPacketsReceived, javax.swing.GroupLayout.PREFERRED_SIZE, 165, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel16Layout.setVerticalGroup(
             jPanel16Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(lblPacketsReceived, javax.swing.GroupLayout.DEFAULT_SIZE, 69, Short.MAX_VALUE)
             .addComponent(lblPacketsReceived, javax.swing.GroupLayout.DEFAULT_SIZE, 69, Short.MAX_VALUE)
         );
 
@@ -390,7 +556,9 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel17.setForeground(new java.awt.Color(0, 51, 102));
 
         lblPacketLossRate.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblPacketLossRate.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblPacketLossRate.setForeground(new java.awt.Color(255, 255, 255));
+        lblPacketLossRate.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketLossRate.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblPacketLossRate.setText("Tỷ lệ mất gói: 0.00%");
 
@@ -401,9 +569,12 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel17Layout.createSequentialGroup()
                 .addComponent(lblPacketLossRate, javax.swing.GroupLayout.PREFERRED_SIZE, 178, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+                .addComponent(lblPacketLossRate, javax.swing.GroupLayout.PREFERRED_SIZE, 178, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel17Layout.setVerticalGroup(
             jPanel17Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(lblPacketLossRate, javax.swing.GroupLayout.DEFAULT_SIZE, 69, Short.MAX_VALUE)
             .addComponent(lblPacketLossRate, javax.swing.GroupLayout.DEFAULT_SIZE, 69, Short.MAX_VALUE)
         );
 
@@ -412,9 +583,10 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel18.setForeground(new java.awt.Color(0, 51, 102));
 
         lblLatency.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblLatency.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblLatency.setForeground(new java.awt.Color(255, 255, 255));
         lblLatency.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
+        lblLatency.setText("Latency(ms): --ms");
 
         javax.swing.GroupLayout jPanel18Layout = new javax.swing.GroupLayout(jPanel18);
         jPanel18.setLayout(jPanel18Layout);
@@ -423,9 +595,12 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel18Layout.createSequentialGroup()
                 .addComponent(lblLatency, javax.swing.GroupLayout.PREFERRED_SIZE, 178, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+                .addComponent(lblLatency, javax.swing.GroupLayout.PREFERRED_SIZE, 178, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel18Layout.setVerticalGroup(
             jPanel18Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(lblLatency, javax.swing.GroupLayout.DEFAULT_SIZE, 72, Short.MAX_VALUE)
             .addComponent(lblLatency, javax.swing.GroupLayout.DEFAULT_SIZE, 72, Short.MAX_VALUE)
         );
 
@@ -434,7 +609,9 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel19.setForeground(new java.awt.Color(0, 51, 102));
 
         lblJitter.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblJitter.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblJitter.setForeground(new java.awt.Color(255, 255, 255));
+        lblJitter.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblJitter.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblJitter.setText("Jitter(ms): --ms");
 
@@ -446,9 +623,16 @@ public class ListenForm extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(lblJitter, javax.swing.GroupLayout.PREFERRED_SIZE, 172, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel19Layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(lblJitter, javax.swing.GroupLayout.PREFERRED_SIZE, 172, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap())
         );
         jPanel19Layout.setVerticalGroup(
             jPanel19Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel19Layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(lblJitter, javax.swing.GroupLayout.PREFERRED_SIZE, 73, javax.swing.GroupLayout.PREFERRED_SIZE))
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel19Layout.createSequentialGroup()
                 .addGap(0, 0, Short.MAX_VALUE)
                 .addComponent(lblJitter, javax.swing.GroupLayout.PREFERRED_SIZE, 73, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -463,7 +647,9 @@ public class ListenForm extends javax.swing.JFrame {
         jPanel20.setForeground(new java.awt.Color(0, 51, 102));
 
         lblBytesReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        lblBytesReceived.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         lblBytesReceived.setForeground(new java.awt.Color(255, 255, 255));
+        lblBytesReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblBytesReceived.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         lblBytesReceived.setText("Dung lượng: 0kb");
 
@@ -474,16 +660,19 @@ public class ListenForm extends javax.swing.JFrame {
             .addGroup(jPanel20Layout.createSequentialGroup()
                 .addComponent(lblBytesReceived, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
+                .addComponent(lblBytesReceived, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 0, Short.MAX_VALUE))
         );
         jPanel20Layout.setVerticalGroup(
             jPanel20Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(lblBytesReceived, javax.swing.GroupLayout.DEFAULT_SIZE, 64, Short.MAX_VALUE)
             .addComponent(lblBytesReceived, javax.swing.GroupLayout.DEFAULT_SIZE, 64, Short.MAX_VALUE)
         );
 
         jLabel31.setForeground(new java.awt.Color(255, 255, 255));
         jLabel31.setText("Mức đệm");
 
-        cboJitterBuffer.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "50ms", "75ms", "100ms", "200ms", "300ms", "400ms", "500ms" }));
+        cboJitterBuffer.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "50ms", "75ms", "100ms", "150ms", "250ms", "500ms" }));
         cboJitterBuffer.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 cboJitterBufferActionPerformed(evt);
@@ -493,6 +682,8 @@ public class ListenForm extends javax.swing.JFrame {
         lblJitterBuffer.setForeground(new java.awt.Color(255, 255, 255));
         lblJitterBuffer.setText("Jitter Buffer: 50 ms");
 
+        btnResetStats.setBackground(new java.awt.Color(0, 51, 255));
+        btnResetStats.setForeground(new java.awt.Color(255, 255, 255));
         btnResetStats.setBackground(new java.awt.Color(0, 51, 255));
         btnResetStats.setForeground(new java.awt.Color(255, 255, 255));
         btnResetStats.setText("Đặt lại thống kê");
@@ -518,15 +709,42 @@ public class ListenForm extends javax.swing.JFrame {
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
                     .addGroup(jPanel6Layout.createSequentialGroup()
                         .addGap(18, 18, 18)
+                        .addGap(18, 18, 18)
                         .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel23)
                             .addComponent(jLabel23)
                             .addGroup(jPanel6Layout.createSequentialGroup()
                                 .addComponent(jLabel31)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(cboJitterBuffer, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(lblJitterBuffer))
+                            .addComponent(jLabel13)
+                            .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 589, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addGap(26, 26, 26)
+                        .addComponent(jLabel11)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(btnResetStats)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jPanel19, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                        .addComponent(jPanel14, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(jPanel16, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .addGap(5, 5, 5)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addGap(44, 44, 44)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel18, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel20, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
+                        .addGap(40, 40, 40)
+                        .addComponent(jPanel17, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                                 .addComponent(lblJitterBuffer))
                             .addComponent(jLabel13)
                             .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 589, javax.swing.GroupLayout.PREFERRED_SIZE)))
@@ -590,9 +808,45 @@ public class ListenForm extends javax.swing.JFrame {
                         .addGap(18, 18, 18)
                         .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 157, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addGap(94, 94, 94))
+            .addGroup(jPanel6Layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addComponent(jLabel13)
+                        .addGap(18, 18, 18)
+                        .addComponent(jLabel23)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel31)
+                            .addComponent(cboJitterBuffer, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblJitterBuffer)))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel16, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel17, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel14, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel20, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addGap(44, 44, 44)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jPanel19, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jPanel18, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(btnResetStats, javax.swing.GroupLayout.PREFERRED_SIZE, 36, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel11))
+                        .addGap(18, 18, 18)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 157, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(94, 94, 94))
         );
 
         jPanel7.setBackground(new java.awt.Color(0, 51, 102));
+        jPanel7.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
         jPanel7.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
         jPanel7.setForeground(new java.awt.Color(0, 51, 102));
 
@@ -606,8 +860,14 @@ public class ListenForm extends javax.swing.JFrame {
                 sliderVolumeStateChanged(evt);
             }
         });
+        sliderVolume.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                sliderVolumeStateChanged(evt);
+            }
+        });
 
         btnVolumeDown.setBackground(new java.awt.Color(0, 51, 102));
+        btnVolumeDown.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeDown.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeDown.setForeground(new java.awt.Color(255, 255, 255));
         btnVolumeDown.setText("-");
@@ -620,11 +880,15 @@ public class ListenForm extends javax.swing.JFrame {
         lblVolumeValue.setFont(new java.awt.Font("Segoe UI", 1, 16)); // NOI18N
         lblVolumeValue.setForeground(new java.awt.Color(255, 255, 255));
         lblVolumeValue.setText("50%");
+        lblVolumeValue.setFont(new java.awt.Font("Segoe UI", 1, 16)); // NOI18N
+        lblVolumeValue.setForeground(new java.awt.Color(255, 255, 255));
+        lblVolumeValue.setText("50%");
 
         jLabel18.setForeground(new java.awt.Color(255, 255, 255));
         jLabel18.setText("Cường độ âm thanh (Input level)");
 
         btnVolumeUp.setBackground(new java.awt.Color(0, 51, 102));
+        btnVolumeUp.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeUp.setFont(new java.awt.Font("Segoe UI", 1, 13)); // NOI18N
         btnVolumeUp.setForeground(new java.awt.Color(255, 255, 255));
         btnVolumeUp.setText("+");
@@ -642,6 +906,7 @@ public class ListenForm extends javax.swing.JFrame {
                 .addGap(30, 30, 30)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel16)
+                    .addComponent(jLabel16)
                     .addGroup(jPanel7Layout.createSequentialGroup()
                         .addComponent(btnVolumeDown, javax.swing.GroupLayout.PREFERRED_SIZE, 44, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
@@ -651,7 +916,12 @@ public class ListenForm extends javax.swing.JFrame {
                         .addGap(32, 32, 32)
                         .addComponent(lblVolumeValue, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addGap(18, 18, 18)
+                        .addComponent(lblVolumeValue, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(18, 18, 18)
                 .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel18)
+                    .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 342, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(110, Short.MAX_VALUE))
                     .addComponent(jLabel18)
                     .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 342, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(110, Short.MAX_VALUE))
@@ -673,10 +943,12 @@ public class ListenForm extends javax.swing.JFrame {
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(lblVolumeValue)
+                            .addComponent(lblVolumeValue)
                             .addComponent(jProgressBar2, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(jPanel7Layout.createSequentialGroup()
                         .addGap(18, 18, 18)
                         .addComponent(sliderVolume, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(29, Short.MAX_VALUE))
                 .addContainerGap(29, Short.MAX_VALUE))
         );
 
@@ -686,6 +958,7 @@ public class ListenForm extends javax.swing.JFrame {
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                 .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, Short.MAX_VALUE))
@@ -702,6 +975,8 @@ public class ListenForm extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, 335, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, 335, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -709,9 +984,11 @@ public class ListenForm extends javax.swing.JFrame {
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
 
@@ -733,6 +1010,9 @@ public class ListenForm extends javax.swing.JFrame {
     }//GEN-LAST:event_btnVolumeDownActionPerformed
 
     private void btnResetStatsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnResetStatsActionPerformed
+        if (audioClient != null) {
+            audioClient.resetStats();
+        }
         if (audioClient != null) {
             audioClient.resetStats();
         }
@@ -765,11 +1045,35 @@ public class ListenForm extends javax.swing.JFrame {
     }//GEN-LAST:event_btnPlayPauseActionPerformed
 
     private void sliderVolumeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_sliderVolumeStateChanged
+    private void btnPlayPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnPlayPauseActionPerformed
+    if (audioPlayback == null) {
+        return;
+    }
+    try {
+        if (!isPlaying) {
+            audioPlayback.resumePlayback();
+            isPlaying = true;
+            btnPlayPause.setText("Tạm dừng");
+        } else {
+            audioPlayback.pausePlayback();
+            isPlaying = false;
+            btnPlayPause.setText("Phát");
+        }
+    } catch (LineUnavailableException e) {
+        showAudioError(e);
+    }
+    }//GEN-LAST:event_btnPlayPauseActionPerformed
+
+    private void sliderVolumeStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_sliderVolumeStateChanged
         // TODO add your handling code here:
         int volume = sliderVolume.getValue();
         lblVolumeValue.setText(volume + "%");
     }//GEN-LAST:event_sliderVolumeStateChanged
+        int volume = sliderVolume.getValue();
+        lblVolumeValue.setText(volume + "%");
+    }//GEN-LAST:event_sliderVolumeStateChanged
 
+    private void cboJitterBufferActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cboJitterBufferActionPerformed
     private void cboJitterBufferActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cboJitterBufferActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_cboJitterBufferActionPerformed
@@ -778,47 +1082,27 @@ public class ListenForm extends javax.swing.JFrame {
         if (audioClient == null) {
             return;
         }
-        if (audioClient.isConnectionAccepted() && audioClient.isServerReachable()) {
-            long authenticationFailures = audioClient.getAuthenticationFailures();
-            jLabel5.setText(authenticationFailures == 0 ? "Đã kết nối"
-                    : "Đã kết nối • gói sai khóa: " + authenticationFailures);
-        } else if (audioClient.isConnectionAccepted()) {
-            jLabel5.setText("Mất kết nối • đang chờ phản hồi");
-        } else {
-            jLabel5.setText(audioClient.getConnectionMessage());
-        }
-        jLabel5.setToolTipText(audioClient.getConnectionMessage());
+        jLabel5.setText(audioClient.isServerReachable() ? "Đã kết nối" : "Đang chờ Server");
         lblPacketsReceived.setText("Gói nhận: " + audioClient.getPacketsReceived());
         lblPacketsLost.setText("Gói mất: " + audioClient.getPacketsLost());
         lblPacketLossRate.setText(String.format("Tỷ lệ mất gói: %.2f%%",
                 audioClient.getPacketLossRate()));
-        double oneWayEstimate = audioClient.getEstimatedOneWayLatencyMs();
-        if (Double.isNaN(oneWayEstimate)) {
-            lblLatency.setText("Ước tính mạng (RTT/2): -- ms");
-            lblJitter.setText(String.format("Jitter: %.2f ms", audioClient.getCurrentJitter()));
-        } else {
-            double effectiveBufferMs = jitterBuffer == null
-                    ? 0 : jitterBuffer.getEffectiveBufferSizeMs();
-            double bufferedEstimate = oneWayEstimate + AudioConstants.FRAME_MS + effectiveBufferMs;
-            lblLatency.setText(String.format("Mạng (RTT/2): %.1f ms", oneWayEstimate));
-            lblLatency.setToolTipText("Ước tính mạng từ một nửa RTT điều khiển; không phải latency end-to-end.");
-            lblJitter.setText(String.format("Jitter %.2f ms • Mạng + frame + đệm ≈ %.1f ms%s",
-                    audioClient.getCurrentJitter(), bufferedEstimate,
-                    bufferedEstimate >= 150 ? " (trên mục tiêu 150 ms)" : ""));
-            lblJitterBuffer.setToolTipText("Mức hiệu lực được làm tròn theo frame 20 ms.");
-        }
+        lblLatency.setText("Latency: " + audioClient.getAvgLatency() + " ms");
+        lblJitter.setText(String.format("Jitter: %.2f ms", audioClient.getCurrentJitter()));
         lblBytesReceived.setText(String.format("Dung lượng nhận: %d KB",
                 audioClient.getKilobytesReceived()));
         if (jitterBuffer != null) {
-            lblJitterBuffer.setText("Buffer: " + jitterBuffer.getBufferSizeMs() + "→"
-                    + jitterBuffer.getEffectiveBufferSizeMs() + " ms • "
-                    + jitterBuffer.size() + " gói");
+            lblJitterBuffer.setText("Jitter Buffer: " + jitterBuffer.getBufferSizeMs()
+                    + " ms • " + jitterBuffer.size() + " gói đang đệm");
         }
     }
 
     private void stopClient() {
         if (statsTimer != null) {
             statsTimer.stop();
+        }
+        if (deviceCheckTimer != null) {
+            deviceCheckTimer.stop();
         }
         if (audioClient != null) {
             audioClient.stopClient();
@@ -867,11 +1151,12 @@ public class ListenForm extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnPlayPause;
+    private javax.swing.JButton btnPlayPause;
     private javax.swing.JButton btnResetStats;
     private javax.swing.JButton btnVolumeDown;
     private javax.swing.JButton btnVolumeUp;
     private javax.swing.JComboBox<String> cboJitterBuffer;
-    private javax.swing.JComboBox<String> jComboBox1;
+    private javax.swing.JComboBox<String> cboOutputDevice;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel11;
     private javax.swing.JLabel jLabel13;
@@ -911,6 +1196,7 @@ public class ListenForm extends javax.swing.JFrame {
     private javax.swing.JLabel lblPacketLossRate;
     private javax.swing.JLabel lblPacketsLost;
     private javax.swing.JLabel lblPacketsReceived;
+    private javax.swing.JLabel lblVolumeValue;
     private javax.swing.JLabel lblVolumeValue;
     private javax.swing.JSlider sliderVolume;
     private javax.swing.JTextArea txtLog;
