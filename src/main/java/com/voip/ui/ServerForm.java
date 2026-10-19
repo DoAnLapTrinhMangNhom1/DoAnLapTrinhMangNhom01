@@ -97,8 +97,6 @@ public class ServerForm extends javax.swing.JFrame {
         btnRefreshClients = new javax.swing.JButton();
         pnlMicMonitor = new javax.swing.JPanel();
         lblMicTitle = new javax.swing.JLabel();
-        progressMicLevel = new javax.swing.JProgressBar();
-        lblMicLevel = new javax.swing.JLabel();
         pnlWaveform = new javax.swing.JPanel();
         jProgressBar2 = new javax.swing.JProgressBar();
         lblMicLevel1 = new javax.swing.JLabel();
@@ -183,9 +181,9 @@ public class ServerForm extends javax.swing.JFrame {
                     .addComponent(jLabel1))
                 .addGap(84, 84, 84)
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(80, 80, 80)
+                .addGap(99, 99, 99)
                 .addComponent(btnStartBroadcast, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(37, 37, 37)
+                .addGap(28, 28, 28)
                 .addComponent(btnStopBroadcast, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -283,13 +281,6 @@ public class ServerForm extends javax.swing.JFrame {
         lblMicTitle.setForeground(new java.awt.Color(255, 255, 255));
         lblMicTitle.setText("CƯỜNG ĐỘ MICROPHONE");
 
-        progressMicLevel.setForeground(new java.awt.Color(0, 51, 102));
-        progressMicLevel.setStringPainted(true);
-
-        lblMicLevel.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        lblMicLevel.setForeground(new java.awt.Color(255, 255, 255));
-        lblMicLevel.setText("Mức tín hiệu: 0%");
-
         pnlWaveform.setBackground(new java.awt.Color(0, 51, 102));
         pnlWaveform.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 51, 255)));
 
@@ -314,27 +305,19 @@ public class ServerForm extends javax.swing.JFrame {
         lblMicLevel1.setForeground(new java.awt.Color(255, 255, 255));
         lblMicLevel1.setText(" Thiết bị đầu vào");
 
-        jComboBox1.setModel(new javax.swing.DefaultComboBoxModel<>());
-
         javax.swing.GroupLayout pnlMicMonitorLayout = new javax.swing.GroupLayout(pnlMicMonitor);
         pnlMicMonitor.setLayout(pnlMicMonitorLayout);
         pnlMicMonitorLayout.setHorizontalGroup(
             pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(pnlMicMonitorLayout.createSequentialGroup()
                 .addGap(19, 19, 19)
-                .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(pnlWaveform, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(lblMicTitle)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, pnlMicMonitorLayout.createSequentialGroup()
-                        .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(lblMicLevel)
-                            .addComponent(progressMicLevel, javax.swing.GroupLayout.PREFERRED_SIZE, 292, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addGroup(pnlMicMonitorLayout.createSequentialGroup()
-                                .addComponent(lblMicLevel1)
-                                .addGap(153, 153, 153))
-                            .addComponent(jComboBox1, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                    .addGroup(pnlMicMonitorLayout.createSequentialGroup()
+                        .addComponent(lblMicLevel1)
+                        .addGap(29, 29, 29)
+                        .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, 410, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(15, Short.MAX_VALUE))
         );
         pnlMicMonitorLayout.setVerticalGroup(
@@ -346,13 +329,9 @@ public class ServerForm extends javax.swing.JFrame {
                 .addComponent(pnlWaveform, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGap(18, 18, 18)
                 .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(lblMicLevel)
-                    .addComponent(lblMicLevel1))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addGroup(pnlMicMonitorLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(progressMicLevel, javax.swing.GroupLayout.PREFERRED_SIZE, 29, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(lblMicLevel1)
                     .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(33, 33, 33))
+                .addGap(70, 70, 70))
         );
 
         pnlFooter.setBackground(new java.awt.Color(0, 51, 102));
@@ -380,7 +359,7 @@ public class ServerForm extends javax.swing.JFrame {
         pnlFooterLayout.setVerticalGroup(
             pnlFooterLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, pnlFooterLayout.createSequentialGroup()
-                .addContainerGap(20, Short.MAX_VALUE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(pnlFooterLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(lblProtocol)
                     .addComponent(lblServerFooterStatus))
@@ -411,7 +390,7 @@ public class ServerForm extends javax.swing.JFrame {
                     .addComponent(pnlClients, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(pnlMicMonitor, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(pnlFooter, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(pnlFooter, javax.swing.GroupLayout.PREFERRED_SIZE, 69, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
 
@@ -423,7 +402,9 @@ public class ServerForm extends javax.swing.JFrame {
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGroup(layout.createSequentialGroup()
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(0, 29, Short.MAX_VALUE))
         );
 
         pack();
@@ -454,24 +435,28 @@ public class ServerForm extends javax.swing.JFrame {
         btnStartBroadcast.setEnabled(false);
         jComboBox1.setEnabled(false);
         lblServerStatus.setText("Đang khởi động...");
-        new SwingWorker<Void, Void>() {
+        new SwingWorker<AudioServer, Void>() {
             @Override
-            protected Void doInBackground() throws Exception {
-                audioServer = new AudioServer(port, selectedWav, selectedInput);
-                audioServer.startServer();
-                return null;
+            protected AudioServer doInBackground() throws Exception {
+                AudioServer server = new AudioServer(port, selectedWav, selectedInput);
+                server.startServer();
+                return server;
             }
 
             @Override
             protected void done() {
                 try {
-                    get();
+                    audioServer = get();
                     lblServerStatus.setText("Đang phát");
                     lblServerFooterStatus.setText("Server đang phát • " + audioServer.getCodec());
+                    jComboBox1.setEnabled(false);
                     btnStopBroadcast.setEnabled(true);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     showStartError(e);
+                    btnStartBroadcast.setEnabled(true);
+                    jComboBox1.setEnabled(true);
+                    lblServerStatus.setText("Chưa phát");
                 } catch (ExecutionException e) {
                     audioServer = null;
                     showStartError(e.getCause());
@@ -497,6 +482,8 @@ public class ServerForm extends javax.swing.JFrame {
         btnStartBroadcast.setEnabled(true);
         jComboBox1.setEnabled(true);
         btnStopBroadcast.setEnabled(false);
+        jProgressBar2.setValue(0);
+        jProgressBar2.setString("Mức tín hiệu: 0%");
         refreshServerStatus();
     }
 
@@ -511,11 +498,15 @@ public class ServerForm extends javax.swing.JFrame {
             btnStartBroadcast.setEnabled(false);
             btnStopBroadcast.setEnabled(true);
         }
+        String captureError = current.getAudioCaptureError();
+        if (captureError != null) {
+            lblServerStatus.setText("Lỗi thu âm");
+            lblServerFooterStatus.setText(captureError);
+        }
+        int inputLevel = current.getInputLevelPercent();
+        jProgressBar2.setValue(inputLevel);
+        jProgressBar2.setString("Mức tín hiệu: " + inputLevel + "%");
         lblClientCount.setText("Số người nghe: " + current.getClientCount());
-        lblMicLevel.setText("Đã gửi: " + current.getPacketsSent() + " gói • "
-                + current.getBytesSent() / 1024 + " KB");
-        progressMicLevel.setValue(Math.min(100, current.getClientCount() * 10));
-        progressMicLevel.setString(current.getClientCount() + " client");
         DefaultTableModel model = (DefaultTableModel) tblClients.getModel();
         model.setRowCount(0);
         int row = 1;
@@ -580,7 +571,6 @@ public class ServerForm extends javax.swing.JFrame {
     private javax.swing.JProgressBar jProgressBar2;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JLabel lblClientCount;
-    private javax.swing.JLabel lblMicLevel;
     private javax.swing.JLabel lblMicLevel1;
     private javax.swing.JLabel lblMicTitle;
     private javax.swing.JLabel lblProtocol;
@@ -592,7 +582,6 @@ public class ServerForm extends javax.swing.JFrame {
     private javax.swing.JPanel pnlMicMonitor;
     private javax.swing.JPanel pnlServerHeader;
     private javax.swing.JPanel pnlWaveform;
-    private javax.swing.JProgressBar progressMicLevel;
     private javax.swing.JTable tblClients;
     // End of variables declaration//GEN-END:variables
 }

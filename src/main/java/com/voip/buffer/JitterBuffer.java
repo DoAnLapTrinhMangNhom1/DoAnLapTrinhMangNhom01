@@ -140,6 +140,14 @@ public class JitterBuffer {
         }
         lock.lock();
         try {
+            if (this.bufferSizeMs != bufferSizeMs) {
+                packets.clear();
+                nextSequence = -1;
+                started = false;
+                payloadSize = 0;
+                lastPayload = null;
+                consecutiveLosses = 0;
+            }
             this.bufferSizeMs = bufferSizeMs;
             capacity = Math.max(1, (bufferSizeMs + AudioConstants.FRAME_MS - 1)
                     / AudioConstants.FRAME_MS);
@@ -160,6 +168,15 @@ public class JitterBuffer {
         lock.lock();
         try {
             return capacity * AudioConstants.FRAME_MS;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean isPlayingOut() {
+        lock.lock();
+        try {
+            return started;
         } finally {
             lock.unlock();
         }

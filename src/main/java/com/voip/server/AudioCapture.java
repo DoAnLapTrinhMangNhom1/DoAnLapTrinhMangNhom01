@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.LockSupport;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,12 +24,16 @@ public class AudioCapture implements Runnable {
     private final AudioDataListener listener;
     private final AudioFormat audioFormat;
     private volatile boolean running;
+    private volatile long captureGeneration;
     private TargetDataLine targetDataLine;
     private AudioInputStream audioInputStream;
     private Thread captureThread;
 
     public interface AudioDataListener {
         void onAudioDataCaptured(byte[] data, int length);
+
+        default void onAudioCaptureFailed(IOException error) {
+        }
 
         default void onAudioSourceEnded() {
         }
@@ -60,6 +65,7 @@ public class AudioCapture implements Runnable {
         try {
             line.open(audioFormat);
             line.start();
+            line.flush();
             targetDataLine = line;
             startThread();
         } catch (LineUnavailableException | RuntimeException e) {
@@ -100,16 +106,22 @@ public class AudioCapture implements Runnable {
     }
 
     private void startThread() {
+        long generation = ++captureGeneration;
         running = true;
-        captureThread = new Thread(this, "Audio-Capture-Thread");
+        TargetDataLine line = targetDataLine;
+        AudioInputStream stream = audioInputStream;
+        captureThread = new Thread(
+                () -> capture(generation, line, stream), "Audio-Capture-Thread");
         captureThread.setDaemon(true);
         captureThread.start();
     }
 
     public synchronized void stopCapture() {
+        ++captureGeneration;
         running = false;
         if (targetDataLine != null) {
             targetDataLine.stop();
+            targetDataLine.flush();
             targetDataLine.close();
             targetDataLine = null;
         }
@@ -126,15 +138,17 @@ public class AudioCapture implements Runnable {
             thread.interrupt();
             if (thread != Thread.currentThread()) {
                 try {
-                    thread.join(1000);
+                    thread.join(3000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Bị ngắt khi chờ luồng thu âm dừng.", e);
                 }
             }
             if (!thread.isAlive()) {
                 captureThread = null;
             } else {
-                LOGGER.warning("Luồng thu âm chưa dừng sau khi đóng nguồn.");
+                throw new IllegalStateException(
+                        "Luồng thu âm cũ chưa dừng sau khi đóng microphone; không thể mở thiết bị mới an toàn.");
             }
         }
     }
@@ -159,45 +173,66 @@ public class AudioCapture implements Runnable {
 
     @Override
     public void run() {
+        capture(captureGeneration, targetDataLine, audioInputStream);
+    }
+
+    private void capture(long generation, TargetDataLine line, AudioInputStream stream) {
         byte[] frame = new byte[AudioConstants.PCM_FRAME_BYTES];
         long nextFrameTime = System.nanoTime();
-        TargetDataLine line = targetDataLine;
-        AudioInputStream stream = audioInputStream;
         boolean reachedEndOfInput = false;
         try {
-            while (running) {
-                int bytesRead = line != null ? readFullFrame(line, frame)
-                        : readFullFrame(stream, frame);
+            while (isCaptureActive(generation)) {
+                int bytesRead = line != null ? readFullFrame(line, frame, generation)
+                        : readFullFrame(stream, frame, generation);
                 if (bytesRead < 0) {
-                    reachedEndOfInput = stream != null;
+                    reachedEndOfInput = stream != null && isCaptureActive(generation);
                     break;
                 }
-                if (bytesRead == frame.length && listener != null) {
+                if (bytesRead == frame.length && listener != null
+                        && isCaptureActive(generation)) {
                     listener.onAudioDataCaptured(Arrays.copyOf(frame, bytesRead), bytesRead);
                 }
                 nextFrameTime += AudioConstants.FRAME_MS * 1_000_000L;
                 long remaining = nextFrameTime - System.nanoTime();
-                if (remaining > 0 && line == null) {
+                if (remaining > 0 && line == null && isCaptureActive(generation)) {
                     java.util.concurrent.locks.LockSupport.parkNanos(remaining);
                 } else if (remaining < -AudioConstants.FRAME_MS * 2_000_000L) {
                     nextFrameTime = System.nanoTime();
                 }
             }
         } catch (IOException e) {
-            if (running) {
+            if (isCaptureActive(generation)) {
                 LOGGER.log(Level.SEVERE, "Lỗi đọc nguồn âm thanh.", e);
+                if (listener != null) {
+                    listener.onAudioCaptureFailed(e);
+                }
+            }
+        } catch (RuntimeException e) {
+            if (isCaptureActive(generation)) {
+                LOGGER.log(Level.SEVERE, "Lỗi driver khi đọc nguồn âm thanh.", e);
+                if (listener != null) {
+                    listener.onAudioCaptureFailed(
+                            new IOException("Lỗi driver âm thanh: " + e.getMessage(), e));
+                }
             }
         } finally {
-            running = false;
-            if (reachedEndOfInput && listener != null) {
+            if (captureGeneration == generation) {
+                running = false;
+            }
+            if (reachedEndOfInput && listener != null && captureGeneration == generation) {
                 listener.onAudioSourceEnded();
             }
         }
     }
 
-    private int readFullFrame(AudioInputStream stream, byte[] frame) throws IOException {
+    private boolean isCaptureActive(long generation) {
+        return running && captureGeneration == generation;
+    }
+
+    private int readFullFrame(AudioInputStream stream, byte[] frame, long generation)
+            throws IOException {
         int offset = 0;
-        while (running && offset < frame.length) {
+        while (isCaptureActive(generation) && offset < frame.length) {
             int count = stream.read(frame, offset, frame.length - offset);
             if (count < 0) {
                 return -1;
@@ -207,13 +242,29 @@ public class AudioCapture implements Runnable {
         return offset == frame.length ? offset : -1;
     }
 
-    private int readFullFrame(TargetDataLine line, byte[] frame) {
+    private int readFullFrame(TargetDataLine line, byte[] frame, long generation)
+            throws IOException {
         int offset = 0;
-        while (running && offset < frame.length) {
+        long noDataSince = 0;
+        while (isCaptureActive(generation) && offset < frame.length) {
             int count = line.read(frame, offset, frame.length - offset);
-            if (count <= 0) {
-                return -1;
+            if (count < 0) {
+                throw new IOException("Microphone đã ngừng cung cấp dữ liệu.");
             }
+            if (count == 0) {
+                if (!isCaptureActive(generation)) {
+                    return -1;
+                }
+                if (noDataSince == 0) {
+                    noDataSince = System.nanoTime();
+                } else if (System.nanoTime() - noDataSince >= 2_000_000_000L) {
+                    throw new IOException(
+                            "Microphone không cung cấp dữ liệu trong 2 giây.");
+                }
+                LockSupport.parkNanos(1_000_000L);
+                continue;
+            }
+            noDataSince = 0;
             offset += count;
         }
         return offset == frame.length ? offset : -1;
