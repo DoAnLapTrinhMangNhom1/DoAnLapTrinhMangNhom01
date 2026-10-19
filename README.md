@@ -46,3 +46,14 @@ Mặc định là PCM signed 16-bit, mono, 16 kHz, big-endian; mỗi gói gồm 
 - JOIN thương lượng payload type và có/không mã hóa; cấu hình không khớp sẽ bị server từ chối thay vì phát luồng không tương thích.
 - Latency hiển thị là ước lượng một chiều từ RTT/2; chỉ báo thêm RTT/2 + một frame + jitter buffer, không bao gồm đầy đủ độ trễ thiết bị thu/phát và không thể bảo đảm dưới 150 ms trên mọi mạng. Đồng hồ hệ thống không cần đồng bộ cho phép đo RTT này.
 - Khi WAV phát hết, giao diện báo kết thúc nguồn; cần dừng server trước khi khởi động phiên phát mới.
+
+## 6. Bảng đóng góp của thành viên
+
+Điền thông tin thực tế của từng thành viên và các Merge Request liên quan trước khi nộp báo cáo.
+
+| MSSV | Họ và Tên | Công việc đã thực hiện | Merge Requests |
+|---|---|---|---|
+| `[MSSV thành viên 1]` | `[Họ và tên]` | `[Mô tả phần việc]` | `[!số MR hoặc link; nếu không có, ghi —]` |
+| `[MSSV thành viên 2]` | `[Họ và tên]` | `[Mô tả phần việc]` | `[!số MR hoặc link; nếu không có, ghi —]` |
+| `[MSSV thành viên 3]` | `[Họ và tên]` | `[Mô tả phần việc]` | `[!số MR hoặc link; nếu không có, ghi —]` |
+| `[MSSV thành viên 4]` | `[Họ và tên]` | `[Mô tả phần việc]` | `[!số MR hoặc link; nếu không có, ghi —]` |
