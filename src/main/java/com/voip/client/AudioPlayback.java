@@ -1,90 +1,250 @@
 package com.voip.client;
 
-import buffer.JitterBuffer;
-import protocol.RTPPacket;
+import com.voip.buffer.JitterBuffer;
 import com.voip.protocol.AudioConstants;
+import com.voip.protocol.RTPPacket;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
+import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.Line;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AudioPlayback implements Runnable {
     private static final Logger LOGGER = Logger.getLogger(AudioPlayback.class.getName());
-
-    private JitterBuffer jitterBuffer;
-    private SourceDataLine speakers;
-    private volatile boolean playing = false;
+    private final JitterBuffer jitterBuffer;
+    private final AudioFormat format = new AudioFormat(AudioConstants.SAMPLE_RATE,
+            AudioConstants.SAMPLE_SIZE_BITS, AudioConstants.CHANNELS,
+            AudioConstants.SIGNED, AudioConstants.BIG_ENDIAN);
+    private volatile SourceDataLine speakers;
+    private volatile boolean playing;
+    private volatile boolean stopped;
+    private volatile Mixer.Info selectedMixer;
+    private volatile DeviceChangeListener deviceChangeListener;
+    private volatile int currentVolumePercent = 100;
+    private List<Mixer.Info> lastKnownSpeakers = new ArrayList<>();
     private Thread playbackThread;
 
-    // Định dạng âm thanh chuẩn cho VoIP (Phải khớp với cấu hình bên Server AudioCapture)
-    private AudioFormat format = new AudioFormat(
-            AudioConstants.SAMPLE_RATE,
-            AudioConstants.SAMPLE_SIZE_BITS,
-            AudioConstants.CHANNELS,
-            AudioConstants.SIGNED,
-            AudioConstants.BIG_ENDIAN
-    );
+    public interface DeviceChangeListener {
+        void onDeviceRemoved(Mixer.Info oldDevice);
+        void onDeviceAdded(List<Mixer.Info> newDevices);
+    }
 
     public AudioPlayback(JitterBuffer jitterBuffer) {
         this.jitterBuffer = jitterBuffer;
+        this.lastKnownSpeakers = getAvailableSpeakers();
     }
 
-    public void initLine() throws Exception {
-        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-        if (!AudioSystem.isLineSupported(info)) {
-            throw new IllegalArgumentException("Audio format không được hỗ trợ bởi hệ thống.");
-        }
-        speakers = (SourceDataLine) AudioSystem.getLine(info);
-        speakers.open(format);
-        speakers.start();
+    public AudioPlayback(JitterBuffer jitterBuffer, Mixer.Info speaker) {
+        this(jitterBuffer);
+        this.selectedMixer = speaker;
     }
 
-    public void startPlayback() {
-        if (playing) return;
-        try {
-            if (speakers == null || !speakers.isOpen()) {
-                initLine();
+    public void setDeviceChangeListener(DeviceChangeListener listener) {
+        this.deviceChangeListener = listener;
+    }
+
+    public static List<Mixer.Info> getAvailableSpeakers() {
+        List<Mixer.Info> speakers = new ArrayList<>();
+        Mixer.Info[] mixers = AudioSystem.getMixerInfo();
+        AudioFormat format = new AudioFormat(AudioConstants.SAMPLE_RATE,
+                AudioConstants.SAMPLE_SIZE_BITS, AudioConstants.CHANNELS,
+                AudioConstants.SIGNED, AudioConstants.BIG_ENDIAN);
+
+        for (Mixer.Info mixer : mixers) {
+            try {
+                Mixer m = AudioSystem.getMixer(mixer);
+                Line.Info[] sourceLines = m.getSourceLineInfo();
+
+                for (Line.Info line : sourceLines) {
+                    if (line.getLineClass() == SourceDataLine.class) {
+                        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+                        if (m.isLineSupported(info)) {
+                            speakers.add(mixer);
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Bỏ qua mixer lỗi
             }
-            playing = true;
-            playbackThread = new Thread(this);
-            playbackThread.start();
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Không thể khởi động AudioPlayback", e);
+        }
+        return speakers;
+    }
+
+    public synchronized void setSpeaker(Mixer.Info speaker) {
+        this.selectedMixer = speaker;
+    }
+
+    public synchronized Mixer.Info getSelectedSpeaker() {
+        return selectedMixer;
+    }
+
+    public synchronized void restartPlayback() throws LineUnavailableException {
+        boolean wasPlaying = playing;
+        stopPlayback();
+
+        // Clear jitter buffer để tránh old audio data conflicts với device mới
+        jitterBuffer.clear();
+
+        try {
+            Thread.sleep(200); // Tăng delay từ 100ms → 200ms để đảm bảo cleanup hoàn toàn
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        if (wasPlaying) {
+            startPlayback();
         }
     }
 
-    public void pausePlayback() {
+    public synchronized boolean isCurrentDeviceAvailable() {
+        if (selectedMixer == null) {
+            return true;
+        }
+        List<Mixer.Info> available = getAvailableSpeakers();
+        return available.contains(selectedMixer);
+    }
+
+    public synchronized void autoSwitchToDefault() {
+        if (selectedMixer != null && !isCurrentDeviceAvailable()) {
+            Mixer.Info oldDevice = selectedMixer;
+            selectedMixer = null;
+            LOGGER.info("Device " + oldDevice.getName() + " không còn available, chuyển sang default");
+
+            if (deviceChangeListener != null) {
+                deviceChangeListener.onDeviceRemoved(oldDevice);
+            }
+        }
+    }
+
+    public synchronized void checkForDeviceChanges() {
+        List<Mixer.Info> currentSpeakers = getAvailableSpeakers();
+
+        List<Mixer.Info> removedDevices = new ArrayList<>();
+        for (Mixer.Info device : lastKnownSpeakers) {
+            if (!currentSpeakers.contains(device)) {
+                removedDevices.add(device);
+            }
+        }
+
+        List<Mixer.Info> addedDevices = new ArrayList<>();
+        for (Mixer.Info device : currentSpeakers) {
+            if (!lastKnownSpeakers.contains(device)) {
+                addedDevices.add(device);
+            }
+        }
+
+        lastKnownSpeakers = currentSpeakers;
+
+        if (!addedDevices.isEmpty() && deviceChangeListener != null) {
+            deviceChangeListener.onDeviceAdded(addedDevices);
+        }
+    }
+
+    public synchronized int getCurrentVolumePercent() {
+        return currentVolumePercent;
+    }
+
+    private void initLine() throws LineUnavailableException {
+        DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+
+        SourceDataLine line;
+        if (selectedMixer != null) {
+            Mixer mixer = AudioSystem.getMixer(selectedMixer);
+            if (!mixer.isLineSupported(info)) {
+                throw new LineUnavailableException(
+                    "Loa '" + selectedMixer.getName() + "' không hỗ trợ định dạng 16 kHz PCM mono.");
+            }
+            line = (SourceDataLine) mixer.getLine(info);
+        } else {
+            if (!AudioSystem.isLineSupported(info)) {
+                throw new LineUnavailableException("Thiết bị phát không hỗ trợ PCM 16 kHz mono.");
+            }
+            line = (SourceDataLine) AudioSystem.getLine(info);
+        }
+
+        line.open(format, AudioConstants.PCM_FRAME_BYTES * 2);
+        line.start();
+        speakers = line;
+    }
+
+    public synchronized void startPlayback() throws LineUnavailableException {
+        if (playing) {
+            return;
+        }
+        stopped = false;
+        if (speakers == null || !speakers.isOpen()) {
+            initLine();
+        }
+        playing = true;
+        playbackThread = new Thread(this, "Audio-Playback-Thread");
+        playbackThread.setDaemon(true);
+        playbackThread.start();
+
+        setVolumePercent(currentVolumePercent);
+    }
+
+    public synchronized void pausePlayback() {
         playing = false;
+        jitterBuffer.clear();
         if (speakers != null) {
             speakers.stop();
+            speakers.flush();
         }
     }
 
-    public void resumePlayback() {
-        if (!playing) {
-            playing = true;
-            if (speakers != null) {
-                speakers.start();
-            }
-            if (playbackThread == null || !playbackThread.isAlive()) {
-                playbackThread = new Thread(this);
-                playbackThread.start();
-            }
+    public synchronized void resumePlayback() throws LineUnavailableException {
+        if (stopped || playing) {
+            return;
+        }
+        if (speakers == null || !speakers.isOpen()) {
+            initLine();
+        }
+        speakers.start();
+        playing = true;
+        if (playbackThread == null || !playbackThread.isAlive()) {
+            playbackThread = new Thread(this, "Audio-Playback-Thread");
+            playbackThread.setDaemon(true);
+            playbackThread.start();
         }
     }
 
-    public void stopPlayback() {
+    public synchronized void stopPlayback() {
         playing = false;
+        stopped = true;
+        SourceDataLine line = speakers;
+        speakers = null;
+        if (line != null) {
+            line.stop();
+            line.flush();
+            line.close();
+        }
         if (playbackThread != null) {
             playbackThread.interrupt();
+            playbackThread = null;
         }
-        if (speakers != null) {
-            speakers.drain();
-            speakers.stop();
-            speakers.close();
+    }
+
+    public void setVolumePercent(int percent) {
+        this.currentVolumePercent = percent;
+        SourceDataLine line = speakers;
+        if (line == null || !line.isOpen() || !line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            return;
+        }
+        FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+        if (percent <= 0) {
+            gain.setValue(gain.getMinimum());
+        } else {
+            float decibels = (float) (20.0 * Math.log10(percent / 100.0));
+            gain.setValue(Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), decibels)));
         }
     }
 
